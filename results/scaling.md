@@ -1,6 +1,6 @@
-# Model size scaling on the first 10 MB of enwik8
+# Model size scaling on enwik8
 
-## Setup
+## Setup of the 10 MB sweep
 
 - Data: the first 10,000,000 bytes of enwik8, tokenized to 3,065,672 tokens with a 4,096-word dictionary.
 - Mode: float bf16, random initial weights, 64 streams, one H100.
@@ -71,6 +71,49 @@ The plots show the seed 1111 runs.
 - The learning-rate sweep is one seed per cell, and seed noise is up to 0.8%.
 - Wall time varies between runs of the same size: 2×256 took between 16 and 30 minutes.
 - The file is 10 MB. A larger file gives a larger model more data to learn from.
+
+## On the full 100 MB, 6×512 is 3.0% ahead of 4×384
+
+- Data: all 100,000,000 bytes of enwik8, tokenized to 31,330,083 tokens. The dictionary adds 29,081 bytes.
+- Mode: float bf16, 64 streams, seed 1111, one run per size.
+- Recipe: the upstream schedule scaled by the token ratio 31,330,083 / 285,202,830.
+- Learning rates are the best ones from the 10 MB sweep.
+
+| Size | Parameters | Learning rate | Bytes | Bits per byte | Behind best | Minutes | GPU |
+|---|---|---|---|---|---|---|---|
+| 4×384 | 10.4M | 1e-3 | 16,362,011 | 1.3090 | +3.1% | 329 | H100 |
+| 6×512 | 23.5M | 1.2e-3 | 15,867,295 | 1.2694 | best | 543 | H100 |
+| 12×768 | 93.0M | 8e-4 | 15,882,829 | 1.2706 | +0.1% | 909 | B200 |
+
+- 6×512 saves 494,716 bytes over 4×384 for 214 more minutes.
+- 12×768 has four times the parameters of 6×512 and ends 0.1% behind it.
+- The 12×768 learning rate was tuned on 10 MB. A rate tuned on 100 MB may change its rank.
+
+## The gap between 4×384 and 6×512 grows with the amount of data
+
+The table shows the bytes written so far at five points of the 100 MB runs, read from the run logs.
+
+| Tokens coded | 4×384 | 6×512 | 12×768 | 4×384 behind 6×512 |
+|---|---|---|---|---|
+| 1.10M | 787,117 | 784,047 | 780,390 | +0.4% |
+| 3.08M | 1,944,583 | 1,932,686 | 1,932,404 | +0.6% |
+| 9.99M | 5,622,356 | 5,543,705 | 5,589,838 | +1.4% |
+| 19.99M | 10,685,956 | 10,435,364 | 10,484,487 | +2.4% |
+| 31.33M | 16,362,011 | 15,867,295 | 15,882,829 | +3.1% |
+
+- 4×384 loses ground at every point.
+- 12×768 leads for the first 3M tokens, is 0.8% behind 6×512 at 10M tokens, and closes to 0.1% by the end.
+
+## Standard compressors on the full 100 MB
+
+| Compressor | Bytes |
+|---|---|
+| gzip -9 | 36,475,811 |
+| bzip2 -9 | 29,008,758 |
+| zstd -19 | 26,944,227 |
+| xz -9e | 24,831,656 |
+| 4×384 plus dictionary | 16,391,092 |
+| 6×512 plus dictionary | 15,896,376 |
 
 ## All 30 runs of the learning-rate sweep
 
