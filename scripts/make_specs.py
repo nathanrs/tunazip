@@ -7,7 +7,8 @@ UPSTREAM_BLOCK_LEN = 500_000
 UPSTREAM_RETRAIN_LEN = 35_000_000
 UPSTREAM_RETRAIN_SCHEDULE = [(0, 1.6e-4), (13000, 1.6e-4), (93000, 7.9e-5),
                              (163000, 4.0e-5), (1911300, 1.3e-5)]
-SLICE_TOKENS = {"enwik8-1MB": 268_011, "enwik8-10MB": 3_065_672}
+SLICE_TOKENS = {"enwik8-1MB": 268_011, "enwik8-10MB": 3_065_672,
+                "enwik8-100MB": 31_330_083}
 HEAD_DIM = 128
 INNER_RATIO = 2.75
 SIZES = {(2, 256): [2e-4, 5e-4, 1.2e-3], (4, 384): [1.5e-4, 4e-4, 1e-3],
