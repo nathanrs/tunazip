@@ -65,12 +65,35 @@ The plots show the seed 1111 runs.
 
 - With 256 streams the model takes a quarter as many online steps.
 - Wall time falls by less than a quarter, because replay steps do not depend on the stream count.
+- With 256 streams each stream covers 20 tokens of a block, so an online prediction sees at most 19 tokens of context.
 
 ## Limits of these numbers
 
 - The learning-rate sweep is one seed per cell, and seed noise is up to 0.8%.
 - Wall time varies between runs of the same size: 2×256 took between 16 and 30 minutes.
 - The file is 10 MB. A larger file gives a larger model more data to learn from.
+- The scaled recipe caps the online context at 82 tokens. The next section measures what that costs.
+
+## Longer blocks save 1.7% to 3.1% on 10 MB and shrink the size gap
+
+Each block splits into 64 streams, and an online prediction sees only the earlier tokens of its own stream in that block.
+
+- The scaled 10 MB recipe has 5,375-token blocks, so a stream is 83 tokens and the context averages 41 tokens.
+- The 100 MB recipe has 54,926-token blocks, so a stream is 858 tokens and the context averages 170 tokens.
+- The 1 MB recipe has 470-token blocks, so the context is at most 6 tokens.
+
+The table runs the 100 MB recipe on the 10 MB slice, one seed, at the learning rates of the main table.
+
+| Size | Scaled 10 MB recipe | 100 MB recipe | Change | Minutes, scaled | Minutes, 100 MB recipe |
+|---|---|---|---|---|---|
+| 4×384 | 2,103,812 | 2,038,742 | −3.1% | 36 | 21 |
+| 6×512 | 2,086,817 | 2,031,852 | −2.6% | 54 | 41 |
+| 12×768 | 2,065,528 | 2,031,283 | −1.7% | 116 | 100 |
+
+- The 100 MB recipe also takes 41,317 replay steps where the scaled recipe takes about 106,000, so the runs are shorter.
+- 4×384 is 0.4% behind 12×768 with the 100 MB recipe, against 1.9% with the scaled recipe.
+- The learning rates were tuned for the scaled recipe.
+- The 10 MB sweep above measures model size under short contexts. The 100 MB runs do not have this limit.
 
 ## On the full 100 MB, 6×512 is 3.0% ahead of 4×384
 
