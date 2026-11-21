@@ -31,6 +31,7 @@ Two cheaper checks run on every device before a round trip:
 
 - 31 operation hashes are identical on H100, B200, A100, L40S, A10, T4, a Linux CPU and a macOS CPU.
 - A 16,000-token training run ends with the same parameter hash on the six GPU types and the CPU.
+- A full decode on a CPU did not finish. The preemptible CPU container restarted seven times, and the job has no checkpoints.
 
 ## Determinism costs no measurable bytes at 10 MB
 
@@ -53,6 +54,7 @@ Two cheaper checks run on every device before a round trip:
 | 1 MB | Short blocks | 3.3 to 3.7 | 6.5 | 1.8 to 2.0 |
 | 10 MB | Short blocks | 35.7 and 52.9 | 76.7 and 77.1 | 1.5 to 2.2 |
 | 10 MB | Long blocks | 20.7 and 23.3 | 70.6 and 70.3 | 3.0 to 3.4 |
+| 100 MB | Long blocks | 329 | 1,076 | 3.3 |
 
 - With long blocks most online steps see 192 tokens of context, and that step is where deterministic mode is slowest.
 - With short blocks the online steps see 41 tokens on average, so the ratio is lower.
@@ -62,6 +64,34 @@ Two cheaper checks run on every device before a round trip:
 - At 12×768 the deterministic replay step takes 218.0 ms against 49.2 ms for float, a ratio of 4.4.
 
 The deterministic step replays as a CUDA graph of fused kernels. Run eagerly it took 140 ms per step at 4×384.
+
+## On the full 100 MB, deterministic mode costs 0.20% more bytes and 3.3 times the time
+
+4×384, seed 1111, learning rate 1e-3, one H100 each.
+
+| Mode | Modeled bytes | Bits per byte | Minutes | Tokens per second |
+|---|---|---|---|---|
+| Float bf16 | 16,362,011 | 1.3090 | 329 | 1,589 |
+| Deterministic, 16 bits | 16,394,464 | 1.3116 | 1,076 | 485 |
+
+- The deterministic run is 32,453 bytes larger, which is 0.20%.
+- The deterministic run takes 3.27 times as long.
+- The deterministic payload is 16,395,046 bytes. With the 29,081-byte dictionary the file is 16,424,127 bytes, which is 1.3139 bits per byte.
+- One seed per mode. A second float seed is 0.15% above the first at 17.8M tokens, so 0.20% is the size of seed noise.
+
+The table shows the bytes written so far at matching points of the runs. The 22-bit-gradient run was stopped at 21.09M tokens.
+
+| Tokens coded | Float | 16-bit gradients | Against float | 22-bit gradients | Against float |
+|---|---|---|---|---|---|
+| 1.10M | 787,117 | 784,658 | −0.31% | 787,452 | +0.04% |
+| 3.08M | 1,944,583 | 1,944,646 | +0.00% | 1,942,513 | −0.11% |
+| 9.99M | 5,622,356 | 5,633,617 | +0.20% | 5,610,505 | −0.21% |
+| 19.99M | 10,685,956 | 10,708,070 | +0.21% | 10,663,420 | −0.21% |
+| 21.09M | 11,237,231 | 11,260,315 | +0.21% | 11,213,628 | −0.21% |
+| 31.33M | 16,362,011 | 16,394,464 | +0.20% | | |
+
+- The 16-bit gap is steady at 0.20% to 0.21% from 10M tokens to the end.
+- The 22-bit run is 0.41% ahead of the 16-bit run at 21.09M tokens, with one seed each.
 
 ## Gradients need 16 bits at 10 MB
 
