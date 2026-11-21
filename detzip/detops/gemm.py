@@ -1,7 +1,7 @@
 import torch
 
 from detzip.detops import fixed
-from detzip.detops.fixed import quantize, scale_twice
+from detzip.detops.fixed import grid_round
 
 FLOAT64_EXACT_INTEGER_LIMIT = 2 ** 53
 
@@ -12,9 +12,7 @@ def exact_matmul(a, b):
     bits = fixed.MATMUL_BITS
     if a.shape[-1] * 2 ** (2 * bits) > FLOAT64_EXACT_INTEGER_LIMIT:
         raise ValueError(f"inner dimension {a.shape[-1]} overflows the exact float64 range")
-    quantized_a, inverse_a = quantize(a, -1, bits)
-    quantized_b, inverse_b = quantize(b, -2, bits)
-    return scale_twice(torch.matmul(quantized_a, quantized_b), inverse_a, inverse_b).float()
+    return torch.matmul(grid_round(a, -1, bits), grid_round(b, -2, bits)).float()
 
 
 class MatmulFunction(torch.autograd.Function):

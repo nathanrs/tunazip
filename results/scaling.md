@@ -48,6 +48,20 @@ The table shows the best learning rate for each size.
 - The upstream online rate of 4e-5 is the worst of the five rates tried at 12×1024.
 - Doubling the best rate costs between 0.02% (4×384) and 1.1% (12×768).
 
+## 256 streams cost 11% to 13% more bytes than 64
+
+| Size | Streams | Learning rate | Bytes | Against 64 streams | Minutes |
+|---|---|---|---|---|---|
+| 4×384 | 64 | 1e-3 | 2,103,812 | | 36 |
+| 4×384 | 256 | 1e-3 | 2,380,157 | +13.1% | 43 |
+| 4×384 | 256 | 2e-3 | 2,375,690 | +12.9% | 28 |
+| 6×512 | 64 | 1.2e-3 | 2,086,817 | | 54 |
+| 6×512 | 256 | 1.2e-3 | 2,333,933 | +11.8% | 41 |
+| 6×512 | 256 | 2.4e-3 | 2,342,999 | +12.3% | 35 |
+
+- With 256 streams the model takes a quarter as many online steps.
+- Wall time falls by less than a quarter, because replay steps do not depend on the stream count.
+
 ## Limits of these numbers
 
 - Each cell is one seed. The ordering across learning rates is not smooth within a size, which suggests run-to-run noise of about 0.3%.

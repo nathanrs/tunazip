@@ -64,20 +64,20 @@ def profile_steps(step, device):
             step()
         synchronize(device)
     averages = profiler.key_averages()
-    kernels = [event for event in profiler.events() if event.device_type == DeviceType.CUDA]
-    by_device_time = sorted(averages, key=lambda row: -row.self_device_time_total)
+    kernel_ms = {}
+    kernels = 0
+    for event in profiler.events():
+        if event.device_type == DeviceType.CUDA:
+            kernels += 1
+            kernel_ms[event.name] = (kernel_ms.get(event.name, 0.0)
+                                     + event.self_device_time_total / 1000 / PROFILED_STEPS)
+    slowest = sorted(kernel_ms.items(), key=lambda item: -item[1])[:TOP_OPERATIONS]
     return {
         "operator_calls_per_step": sum(
             row.count for row in averages if row.key.startswith("aten::")) / PROFILED_STEPS,
-        "kernels_per_step": len(kernels) / PROFILED_STEPS,
-        "kernel_ms_per_step": sum(
-            row.self_device_time_total for row in averages) / 1000 / PROFILED_STEPS,
-        "top_by_kernel_ms_per_step": {
-            row.key: round(row.self_device_time_total / 1000 / PROFILED_STEPS, 3)
-            for row in by_device_time[:TOP_OPERATIONS]},
-        "top_by_calls_per_step": {
-            row.key: row.count / PROFILED_STEPS
-            for row in sorted(averages, key=lambda row: -row.count)[:TOP_OPERATIONS]}}
+        "kernels_per_step": kernels / PROFILED_STEPS,
+        "kernel_ms_per_step": sum(kernel_ms.values()),
+        "slowest_kernels_ms_per_step": {name[:90]: round(ms, 3) for name, ms in slowest}}
 
 
 def bench(config, device, online_windows, steps, with_profile):

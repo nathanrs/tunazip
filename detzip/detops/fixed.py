@@ -12,6 +12,11 @@ template <typename T> T scaled_round(T x, T scale) {
     return nearbyint(__dmul_rn(x, scale));
 }
 """
+GRID_ROUND_SOURCE = """
+template <typename T> T grid_round(T x, T scale, T inverse) {
+    return __dmul_rn(nearbyint(__dmul_rn(x, scale)), inverse);
+}
+"""
 SCALE_TWICE_SOURCE = """
 template <typename T> T scale_twice(T x, T first, T second) {
     return __dmul_rn(__dmul_rn(x, first), second);
@@ -61,10 +66,20 @@ def peak_scales(peak, bits):
     return pow2(shift), pow2(-shift)
 
 
+def peak_of(x, dim):
+    return torch.linalg.vector_norm(x, ord=float("inf"), dim=dim, keepdim=True)
+
+
 def quantize(x, dim, bits):
-    peak = torch.linalg.vector_norm(x, ord=float("inf"), dim=dim, keepdim=True)
-    scale, inverse = peak_scales(peak, bits)
+    scale, inverse = peak_scales(peak_of(x, dim), bits)
     return scaled_round(x, scale), inverse
+
+
+def grid_round(x, dim, bits):
+    scale, inverse = peak_scales(peak_of(x, dim), bits)
+    if x.is_cuda:
+        return fused.kernel(GRID_ROUND_SOURCE)(x, scale, inverse)
+    return torch.round(x.double() * scale) * inverse
 
 
 def exact_sum(x, dim):
