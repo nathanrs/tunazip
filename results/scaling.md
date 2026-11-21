@@ -6,26 +6,30 @@
 - Mode: float bf16, random initial weights, 64 streams, one H100.
 - Recipe: the upstream schedule with block length, replay window and replay schedule scaled by the token ratio 3,065,672 / 285,202,830.
 - Shapes: head dimension 128 and inner width 2.75 × model width at every size.
-- Runs: six sizes, five learning rates each, one seed.
+- Runs: six sizes, five learning rates each with seed 1111, and a second seed at the best rate.
 - Bytes are the modeled size of the token stream. The dictionary adds 28,885 bytes to every row.
 
-## A 10.4M-parameter model is 2.4% behind the 162.6M-parameter original
+## A 10.4M-parameter model is 2.1% behind the 162.6M-parameter original
 
-The table shows the best learning rate for each size.
+The table shows the best learning rate for each size, run with two seeds.
 
-| Size | Parameters | Learning rate | Bytes | Bits per byte | Behind best | Minutes |
-|---|---|---|---|---|---|---|
-| 2×256 | 3.7M | 1.2e-3 | 2,184,623 | 1.7477 | +6.3% | 29 |
-| 4×384 | 10.4M | 1e-3 | 2,103,812 | 1.6830 | +2.4% | 36 |
-| 6×512 | 23.5M | 1.2e-3 | 2,086,817 | 1.6695 | +1.5% | 54 |
-| 8×640 | 45.4M | 5e-4 | 2,086,454 | 1.6692 | +1.5% | 72 |
-| 12×768 | 93.0M | 8e-4 | 2,065,528 | 1.6524 | +0.5% | 116 |
-| 12×1024 | 162.6M | 2.5e-4 | 2,055,182 | 1.6441 | best | 165 |
+| Size | Parameters | Learning rate | Seed 1111 | Seed 2222 | Mean bytes | Behind best | Minutes |
+|---|---|---|---|---|---|---|---|
+| 2×256 | 3.7M | 1.2e-3 | 2,184,623 | 2,184,196 | 2,184,410 | +5.9% | 29 |
+| 4×384 | 10.4M | 1e-3 | 2,103,812 | 2,107,549 | 2,105,680 | +2.1% | 36 |
+| 6×512 | 23.5M | 1.2e-3 | 2,086,817 | 2,092,222 | 2,089,520 | +1.3% | 54 |
+| 8×640 | 45.4M | 5e-4 | 2,086,454 | 2,077,542 | 2,081,998 | +0.9% | 72 |
+| 12×768 | 93.0M | 8e-4 | 2,065,528 | 2,070,030 | 2,067,779 | +0.2% | 116 |
+| 12×1024 | 162.6M | 2.5e-4 | 2,055,182 | 2,071,092 | 2,063,137 | best | 165 |
 
 - 12×1024 is the upstream architecture.
-- 4×384 is the smallest size within 3% of the best result.
-- The largest step is from 2×256 to 4×384: 3.7% fewer bytes for 7 more minutes.
-- From 4×384 to 12×1024 the model has 16 times the parameters and takes 4.6 times the wall time for 2.3% fewer bytes.
+- 4×384 is the smallest size within 3% of the best mean.
+- The largest step is from 2×256 to 4×384: 3.6% fewer bytes for 7 more minutes.
+- From 4×384 to 12×1024 the model has 16 times the parameters and takes 4.6 times the wall time for 2.0% fewer bytes.
+- Two seeds of one size differ by 0.02% to 0.77%.
+- Minutes are from the seed 1111 run.
+
+The plots show the seed 1111 runs.
 
 ![Compressed size by parameter count](scaling-enwik8-10MB-parameters.png)
 
@@ -64,11 +68,11 @@ The table shows the best learning rate for each size.
 
 ## Limits of these numbers
 
-- Each cell is one seed. The ordering across learning rates is not smooth within a size, which suggests run-to-run noise of about 0.3%.
+- The learning-rate sweep is one seed per cell, and seed noise is up to 0.8%.
 - Wall time varies between runs of the same size: 2×256 took between 16 and 30 minutes.
 - The file is 10 MB. A larger file gives a larger model more data to learn from.
 
-## All 30 runs
+## All 30 runs of the learning-rate sweep
 
 | Size | Parameters | Learning rate | Bytes | Bits per byte | Behind best | Minutes |
 |---|---|---|---|---|---|---|
