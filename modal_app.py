@@ -54,7 +54,7 @@ def run_upstream(spec):
                  "--initial_prior", "", "--work_dir", "/tmp/upstream",
                  "--max_tokens", str(len(tokens))]
     for key, value in asdict(config).items():
-        if key not in ("det", "matmul_bits"):
+        if key not in ("det", "activation_bits", "weight_bits", "gradient_bits"):
             arguments += [f"--{key}", str(value)]
     started = time.time()
     process = subprocess.run(

@@ -23,13 +23,13 @@ def op_hashes(device):
         hashes[name] = trace.sha(tensor)
 
     a, b = normal(1, (96, 384), device), normal(2, (384, 160), device)
-    record("matmul", gemm.exact_matmul(a, b))
+    record("matmul", gemm.exact_matmul(a, b, 16, 16))
     record("matmul_wide_range", gemm.exact_matmul(
-        wide_range(3, (96, 384), device), wide_range(4, (384, 160), device)))
+        wide_range(3, (96, 384), device), wide_range(4, (384, 160), device), 16, 16))
     record("matmul_batched", gemm.exact_matmul(
-        normal(5, (4, 2, 48, 32), device), normal(6, (4, 2, 32, 48), device)))
+        normal(5, (4, 2, 48, 32), device), normal(6, (4, 2, 32, 48), device), 16, 16))
     record("matmul_long_inner", gemm.exact_matmul(
-        normal(7, (16, 12288), device), normal(8, (12288, 16), device)))
+        normal(7, (16, 12288), device), normal(8, (12288, 16), device), 16, 8))
 
     x = normal(9, (8, 48, 256), device).requires_grad_()
     weight = normal(10, (512, 256), device, 0.02).requires_grad_()

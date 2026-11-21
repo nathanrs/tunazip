@@ -4,7 +4,6 @@ import torch
 
 from detzip.detops import fused
 
-MATMUL_BITS = 16
 SUM_FRACTION_BITS = 40
 INT64_SUM_BITS = 62
 SCALED_ROUND_SOURCE = """

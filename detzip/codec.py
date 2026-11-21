@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 from detzip import trace
 from detzip.detmodel import DetTransformer
-from detzip.detops import fixed as det_fixed
+from detzip.detops import gemm as det_gemm
 from detzip.detops import functions as det_functions
 from detzip.detops import optim as det_optim
 from detzip.detops.elementwise import host_cos_of_pi_times
@@ -49,7 +49,9 @@ class Config:
     dtype: str = "bf16"
     seed: int = 1111
     det: bool = False
-    matmul_bits: int = 16
+    activation_bits: int = 16
+    weight_bits: int = 16
+    gradient_bits: int = 16
 
 
 class RMSNorm(nn.Module):
@@ -237,7 +239,8 @@ class Codec:
         self.digests = []
         self.log = log
         torch.use_deterministic_algorithms(not config.det)
-        det_fixed.MATMUL_BITS = config.matmul_bits
+        det_gemm.BITS = det_gemm.Bits(
+            config.activation_bits, config.weight_bits, config.gradient_bits)
         np.random.seed(config.seed)
         torch.manual_seed(config.seed)
         if device.type == "cuda":

@@ -5,15 +5,16 @@ import torch
 import torch.nn.functional as F
 
 from detzip import codec
-from detzip.detops import fixed, functions, gemm, optim, selftest
+from detzip.detops import functions, gemm, optim, selftest
 
 GRADIENT_TOLERANCE = 1e-6
+MATMUL_BITS = 16
 
 
 def reference_matmul(a, b):
     def quantize(x, axis):
         peak = np.abs(x).max(axis=axis, keepdims=True)
-        shift = fixed.MATMUL_BITS - np.frexp(peak)[1]
+        shift = MATMUL_BITS - np.frexp(peak)[1]
         return np.rint(x.astype(np.float64) * np.exp2(shift.astype(np.float64))).astype(object), shift
 
     quantized_a, shift_a = quantize(a, -1)
@@ -35,7 +36,7 @@ def test_matmul_matches_big_integer_reference():
              (torch.zeros(3, 9), torch.randn(9, 4)),
              (torch.full((4, 50), 3.0), torch.full((50, 4), -7.0))]
     for a, b in cases:
-        got = gemm.exact_matmul(a, b).numpy()
+        got = gemm.exact_matmul(a, b, MATMUL_BITS, MATMUL_BITS).numpy()
         want = reference_matmul(a.numpy(), b.numpy())
         assert np.array_equal(got.view(np.uint32), want.view(np.uint32))
 
