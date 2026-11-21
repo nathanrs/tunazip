@@ -34,26 +34,6 @@ template <typename T> void peak_scales(T peak, T& scale, T& inverse) {
     inverse = __longlong_as_double(((long long)(exponent - BITS) + 1023LL) << 52);
 }
 """
-PEAK_SHIFT_SOURCE = """
-template <typename T> T peak_shift(T peak) {
-    int exponent;
-    frexp(peak, &exponent);
-    return (T)(BITS - exponent);
-}
-"""
-SHIFTED_ROUND_SOURCE = """
-template <typename T> T shifted_round(T x, T shift) {
-    return (T)nearbyint(__dmul_rn(
-        (double)x, __longlong_as_double(((long long)shift + 1023LL) << 52)));
-}
-"""
-UNSHIFT_SOURCE = """
-template <typename T> T unshift(T x, T shift_a, T shift_b) {
-    return (T)__dmul_rn((double)x, __longlong_as_double(
-        (1023LL - (long long)shift_a - (long long)shift_b) << 52));
-}
-"""
-
 
 def pow2(exponent):
     return ((exponent.to(torch.int64) + 1023) << 52).view(torch.float64)
@@ -98,15 +78,6 @@ def grid_round(x, dim, bits):
     if x.is_cuda:
         return fused.kernel(GRID_ROUND_SOURCE)(x, scale, inverse)
     return torch.round(x.double() * scale) * inverse
-
-
-def integer_round(x, dim, bits):
-    shift = fused.kernel(PEAK_SHIFT_SOURCE.replace("BITS", str(bits)))(peak_of(x, dim))
-    return fused.kernel(SHIFTED_ROUND_SOURCE)(x, shift), shift
-
-
-def unshift(x, shift_a, shift_b):
-    return fused.kernel(UNSHIFT_SOURCE)(x, shift_a, shift_b)
 
 
 def exact_sum(x, dim):

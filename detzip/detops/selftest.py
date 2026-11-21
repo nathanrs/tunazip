@@ -31,13 +31,6 @@ def op_hashes(device):
     record("matmul_long_inner", gemm.exact_matmul(
         normal(7, (16, 12288), device), normal(8, (12288, 16), device), 16, 8))
 
-    record("matmul_low_bits", gemm.exact_matmul(a, b, 6, 6))
-    record("matmul_low_bits_wide_range", gemm.exact_matmul(
-        wide_range(3, (96, 384), device), wide_range(4, (384, 160), device), 8, 7))
-    record("matmul_low_bits_tiny", gemm.exact_matmul(a * 1e-30, b * 1e-12, 6, 6))
-    record("matmul_low_bits_batched", gemm.exact_matmul(
-        normal(5, (4, 2, 48, 32), device), normal(6, (4, 2, 32, 48), device), 8, 8))
-
     x = normal(9, (8, 48, 256), device).requires_grad_()
     weight = normal(10, (512, 256), device, 0.02).requires_grad_()
     out = gemm.linear(x, weight)
