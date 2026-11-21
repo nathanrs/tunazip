@@ -11,6 +11,7 @@ from torch.profiler import ProfilerActivity, profile
 from detzip import codec
 
 PROFILED_STEPS = 3
+WARMUP_STEPS = 3
 TOP_OPERATIONS = 12
 
 
@@ -24,29 +25,33 @@ def online_step(run, tokens, window):
     inp = torch.from_numpy(tokens[:config.batch_size * window].reshape(
         config.batch_size, window)).to(run.device)
     targets = torch.from_numpy(tokens[:config.batch_size]).to(run.device)
-    with run.autocast():
-        logits = run.model(inp, slice(-1, None))
-    code_logits = logits[:, -1, :].float()
-    codec.make_freq_table(code_logits, config.det).cpu()
-    run.train_on(code_logits, targets, run.optimizer, False)
+    run.prepare(run.optimizer, config.lr)
+    code_logits, freq = run.graphs.call(
+        ("predict", window), (inp,), lambda inp: run.predict(inp, True))
+    freq.cpu()
+    run.graphs.call(("learn", window), (targets,), lambda targets: (
+        run.train_on(code_logits, targets, run.optimizer, False),))
 
 
 def replay_step(run, tokens):
     config = run.config
     batch, length = config.retrain_batch_size, config.retrain_update_len
+    prefix_len = config.ctx_len - length
     inp = torch.from_numpy(tokens[:batch * config.ctx_len].reshape(
         batch, config.ctx_len)).to(run.device)
-    targets = torch.from_numpy(tokens[:batch * length]).to(run.device)
+    targets = torch.from_numpy(tokens[:batch * length].reshape(batch, length)).to(run.device)
+    run.prepare(run.retrain_optimizer, config.lr)
     if config.det:
         run.model.next_dropout_keys()
-    with run.autocast():
-        logits = run.model(inp, slice(config.ctx_len - length, config.ctx_len))
-    run.train_on(logits.float().reshape(-1, config.vocab_size), targets,
-                 run.retrain_optimizer, False)
+    (loss,) = run.graphs.call(
+        ("replay", prefix_len, length), (inp, targets),
+        lambda inp, targets: (run.replay_update(inp, targets, prefix_len, length),))
+    loss.item()
 
 
 def time_steps(step, device, steps):
-    step()
+    for _ in range(WARMUP_STEPS):
+        step()
     synchronize(device)
     started = time.perf_counter()
     for _ in range(steps):

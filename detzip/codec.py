@@ -14,6 +14,7 @@ from detzip.detops import fixed as det_fixed
 from detzip.detops import functions as det_functions
 from detzip.detops import optim as det_optim
 from detzip.detops.elementwise import host_cos_of_pi_times
+from detzip.graphs import GraphCache
 from detzip.arithmetic_coder import (ArithmeticDecoder, ArithmeticEncoder,
                                      BitInputStream, BitOutputStream)
 from detzip.trace import tap
@@ -227,14 +228,6 @@ def make_freq_table(logits, det):
     return torch.cumsum(freq, dim=-1)
 
 
-def set_lr(optimizer, lr):
-    if isinstance(optimizer, det_optim.Adam):
-        optimizer.lr = lr
-        return
-    for group in optimizer.param_groups:
-        group["lr"] = lr
-
-
 class Codec:
     def __init__(self, config, device, tracer=None, digest_every=0, log=print):
         self.config = config
@@ -250,16 +243,21 @@ class Codec:
         if device.type == "cuda":
             torch.cuda.manual_seed_all(config.seed)
         model_class = DetTransformer if config.det else Transformer
-        adam = det_optim.Adam if config.det else torch.optim.Adam
         self.model = model_class(config).to(device)
         self.model.eval()
         betas = (config.beta1, config.beta2)
         self.retrain_schedule = parse_piecewise_lr(config.retrain_lr)
-        self.optimizer = adam(
-            self.model.parameters(), lr=config.lr, betas=betas, eps=config.adam_eps)
-        self.retrain_optimizer = adam(
-            self.model.parameters(), lr=self.retrain_schedule[0][1], betas=betas,
-            eps=config.adam_eps)
+        if config.det:
+            self.optimizer = det_optim.Adam(self.model.parameters(), betas, config.adam_eps)
+            self.retrain_optimizer = det_optim.Adam(
+                self.model.parameters(), betas, config.adam_eps)
+        else:
+            self.optimizer = torch.optim.Adam(
+                self.model.parameters(), lr=config.lr, betas=betas, eps=config.adam_eps)
+            self.retrain_optimizer = torch.optim.Adam(
+                self.model.parameters(), lr=self.retrain_schedule[0][1], betas=betas,
+                eps=config.adam_eps)
+        self.graphs = GraphCache(config.det and device.type == "cuda")
         self.amp = device.type == "cuda" and config.dtype == "bf16" and not config.det
         self.cos_of_pi_times = host_cos_of_pi_times if config.det else float_cos_of_pi_times
         self.retrain_step = 0
@@ -267,6 +265,25 @@ class Codec:
     def autocast(self):
         return torch.autocast(device_type=self.device.type, dtype=torch.bfloat16,
                               enabled=self.amp)
+
+    def prepare(self, optimizer, lr):
+        if self.config.det:
+            optimizer.advance(lr)
+            return
+        for group in optimizer.param_groups:
+            group["lr"] = lr
+
+    def predict(self, inp, with_freq):
+        with self.autocast():
+            logits = self.model(inp, slice(-1, None))
+        code_logits = logits[:, -1, :].float()
+        return code_logits, make_freq_table(code_logits, self.config.det) if with_freq else None
+
+    def replay_update(self, inp, targets, prefix_len, length):
+        with self.autocast():
+            logits = self.model(inp, slice(prefix_len, prefix_len + length))
+        return self.train_on(logits.float().reshape(-1, self.config.vocab_size),
+                             targets.reshape(-1), self.retrain_optimizer, False)
 
     def train_on(self, logits, targets, optimizer, traced):
         optimizer.zero_grad(set_to_none=True)
@@ -286,7 +303,7 @@ class Codec:
                 tap(f"grad.{name}", parameter.grad)
             tap("grad_norm", grad_norm)
         if self.config.det:
-            optimizer.step(scale)
+            optimizer.apply(scale)
         else:
             optimizer.step()
         if traced:
@@ -317,15 +334,13 @@ class Codec:
             target_cols = start + np.arange(length)
             targets = torch.from_numpy(
                 file_data[stream_base[:, None] + target_cols[None, :] + 1]).to(self.device)
+            self.prepare(self.retrain_optimizer,
+                         piecewise_lr_at(self.retrain_step, self.retrain_schedule))
             if config.det:
                 self.model.next_dropout_keys()
-            with self.autocast():
-                logits = self.model(inp, slice(prefix_len, prefix_len + length))
-            set_lr(self.retrain_optimizer,
-                   piecewise_lr_at(self.retrain_step, self.retrain_schedule))
-            loss = self.train_on(
-                logits.float().reshape(-1, config.vocab_size), targets.reshape(-1),
-                self.retrain_optimizer, traced=False)
+            (loss,) = self.graphs.call(
+                ("replay", prefix_len, length), (inp, targets),
+                lambda inp, targets: (self.replay_update(inp, targets, prefix_len, length),))
             self.retrain_step += 1
             nats += loss.item() * length
         self.model.eval()
@@ -364,18 +379,18 @@ class Codec:
                 else:
                     offsets = stream_pos - window + np.arange(window)
                     inp = file_data[stream_base[:, None] + offsets[None, :]]
-                set_lr(self.optimizer,
-                       lr_at(train_step, config.lr, min_lr, config.warmup, total_steps,
-                             self.cos_of_pi_times))
-                with self.autocast():
-                    logits = self.model(torch.from_numpy(inp).to(self.device),
-                                        slice(-1, None))
-                code_logits = logits[:, -1, :].float()
+                self.prepare(self.optimizer,
+                             lr_at(train_step, config.lr, min_lr, config.warmup, total_steps,
+                                   self.cos_of_pi_times))
+                with_freq = (encoder is not None or decoder is not None or traced
+                             or config.det)
+                code_logits, freq = self.graphs.call(
+                    None if traced else ("predict", window),
+                    (torch.from_numpy(inp).to(self.device),),
+                    lambda inp: self.predict(inp, with_freq))
                 tap("logits", code_logits)
                 code_pos = stream_base + stream_pos
-                freq = None
-                if encoder is not None or decoder is not None or traced or config.det:
-                    freq = make_freq_table(code_logits, config.det)
+                if freq is not None:
                     tap("freq_table", freq)
                     freq = freq.cpu().numpy()
                     for i in range(batch):
@@ -390,7 +405,10 @@ class Codec:
                 else:
                     n_bits += F.cross_entropy(
                         code_logits, targets, reduction="sum").item() / LOG2
-                self.train_on(code_logits, targets, self.optimizer, traced)
+                self.graphs.call(
+                    None if traced else ("learn", window), (targets,),
+                    lambda targets: (self.train_on(
+                        code_logits, targets, self.optimizer, traced),))
                 if self.digest_every and train_step % self.digest_every == 0:
                     self.digests.append({
                         "step": train_step, "logits": trace.sha(code_logits),

@@ -83,11 +83,12 @@ def op_hashes(device):
     record("embedding_grad", table.grad)
 
     parameter = torch.nn.Parameter(normal(23, (512, 256), device, 0.02))
-    adam = optim.Adam([parameter], lr=4e-5, betas=(0.0, 0.9999), eps=1e-9)
+    adam = optim.Adam([parameter], betas=(0.0, 0.9999), eps=1e-9)
     for step in range(3):
         parameter.grad = wide_range(24 + step, (512, 256), device)
         norm, scale = optim.gradient_scale([parameter], 0.25)
-        adam.step(scale)
+        adam.advance(4e-5)
+        adam.apply(scale)
     record("adam", parameter)
     record("adam_second", adam.second[0])
     hashes["clip_norm"] = float(norm).hex()

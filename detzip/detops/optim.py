@@ -23,14 +23,13 @@ template <typename T> void det_adam(T parameter, T raw_grad, T scale, T first, T
 def gradient_scale(parameters, max_norm):
     flat = torch.cat([parameter.grad.reshape(-1) for parameter in parameters]).double()
     norm = torch.sqrt(exact_sum(product(flat, flat), 0).reshape(()))
-    limit = torch.tensor(max_norm, dtype=torch.float64, device=flat.device)
+    limit = torch.full((), max_norm, dtype=torch.float64, device=flat.device)
     return norm, torch.clamp(limit / (norm + CLIP_EPSILON), max=1.0)
 
 
 class Adam:
-    def __init__(self, parameters, lr, betas, eps):
+    def __init__(self, parameters, betas, eps):
         self.parameters = list(parameters)
-        self.lr = lr
         self.beta1, self.beta2 = betas
         self.eps = eps
         device = self.parameters[0].device
@@ -51,10 +50,10 @@ class Adam:
         for parameter in self.parameters:
             parameter.grad = None
 
-    def advance(self):
+    def advance(self, lr):
         self.beta1_power *= self.beta1
         self.beta2_power *= self.beta2
-        self.step_size.fill_(self.lr / (1.0 - self.beta1_power))
+        self.step_size.fill_(lr / (1.0 - self.beta1_power))
         self.correction.fill_(math.sqrt(1.0 - self.beta2_power))
 
     @torch.no_grad()
@@ -76,7 +75,3 @@ class Adam:
             denominator = torch.sqrt(second) / self.correction + self.eps
             parameter.copy_(
                 (parameter.double() - first / denominator * self.step_size).float())
-
-    def step(self, scale):
-        self.advance()
-        self.apply(scale)

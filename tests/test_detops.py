@@ -84,14 +84,15 @@ def test_adam_matches_torch():
     torch.manual_seed(0)
     det_parameter = torch.nn.Parameter(torch.randn(20, 10))
     float_parameter = torch.nn.Parameter(det_parameter.detach().clone())
-    det_adam = optim.Adam([det_parameter], lr=1e-3, betas=(0.9, 0.999), eps=1e-9)
+    det_adam = optim.Adam([det_parameter], betas=(0.9, 0.999), eps=1e-9)
     float_adam = torch.optim.Adam([float_parameter], lr=1e-3, betas=(0.9, 0.999), eps=1e-9)
     for _ in range(5):
         grad = torch.randn(20, 10)
         det_parameter.grad, float_parameter.grad = grad.clone(), grad.clone()
         _, scale = optim.gradient_scale([det_parameter], 0.25)
         torch.nn.utils.clip_grad_norm_([float_parameter], 0.25)
-        det_adam.step(scale)
+        det_adam.advance(1e-3)
+        det_adam.apply(scale)
         float_adam.step()
     assert relative_error(det_parameter.data, float_parameter.data) < GRADIENT_TOLERANCE
 
