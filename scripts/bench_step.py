@@ -37,6 +37,8 @@ def replay_step(run, tokens):
     inp = torch.from_numpy(tokens[:batch * config.ctx_len].reshape(
         batch, config.ctx_len)).to(run.device)
     targets = torch.from_numpy(tokens[:batch * length]).to(run.device)
+    if config.det:
+        run.model.next_dropout_keys()
     with run.autocast():
         logits = run.model(inp, slice(config.ctx_len - length, config.ctx_len))
     run.train_on(logits.float().reshape(-1, config.vocab_size), targets,

@@ -3,13 +3,14 @@ import math
 import torch
 
 from detzip.detops import fused
-from detzip.detops.fixed import exact_sum
+from detzip.detops.fixed import exact_sum, product
 
 CLIP_EPSILON = 1e-6
 ADAM_SOURCE = """
-template <typename T> void det_adam(T parameter, T grad, T first, T second, T step_size,
-                                    T correction, T& new_parameter, T& new_first,
-                                    T& new_second) {
+template <typename T> void det_adam(T parameter, T raw_grad, T scale, T first, T second,
+                                    T step_size, T correction, T& new_parameter,
+                                    T& new_first, T& new_second) {
+    T grad = (T)(float)__dmul_rn(raw_grad, scale);
     new_first = __dadd_rn(__dmul_rn(first, BETA1), __dmul_rn(grad, ONE_MINUS_BETA1));
     new_second = __dadd_rn(__dmul_rn(second, BETA2),
                            __dmul_rn(__dmul_rn(grad, grad), ONE_MINUS_BETA2));
@@ -19,18 +20,11 @@ template <typename T> void det_adam(T parameter, T grad, T first, T second, T st
 """
 
 
-def clip_gradients(parameters, max_norm):
-    device = parameters[0].device
-    total = torch.zeros((), dtype=torch.float64, device=device)
-    for parameter in parameters:
-        grad64 = parameter.grad.double()
-        total = total + exact_sum(grad64 * grad64, tuple(range(grad64.dim()))).reshape(())
-    norm = torch.sqrt(total)
-    limit = torch.tensor(max_norm, dtype=torch.float64, device=device)
-    scale = torch.clamp(limit / (norm + CLIP_EPSILON), max=1.0)
-    for parameter in parameters:
-        parameter.grad = (parameter.grad.double() * scale).float()
-    return norm
+def gradient_scale(parameters, max_norm):
+    flat = torch.cat([parameter.grad.reshape(-1) for parameter in parameters]).double()
+    norm = torch.sqrt(exact_sum(product(flat, flat), 0).reshape(()))
+    limit = torch.tensor(max_norm, dtype=torch.float64, device=flat.device)
+    return norm, torch.clamp(limit / (norm + CLIP_EPSILON), max=1.0)
 
 
 class Adam:
@@ -64,16 +58,17 @@ class Adam:
         self.correction.fill_(math.sqrt(1.0 - self.beta2_power))
 
     @torch.no_grad()
-    def apply(self):
+    def apply(self, scale):
         for parameter, first, second in zip(self.parameters, self.first, self.second):
             if parameter.is_cuda:
                 new_parameter, new_first, new_second = fused.kernel(self.source, 3)(
-                    parameter, parameter.grad, first, second, self.step_size, self.correction)
+                    parameter, parameter.grad, scale, first, second, self.step_size,
+                    self.correction)
                 first.copy_(new_first)
                 second.copy_(new_second)
                 parameter.copy_(new_parameter)
                 continue
-            grad = parameter.grad.double()
+            grad = (parameter.grad.double() * scale).float().double()
             first.mul_(self.beta1)
             first.add_(grad * (1.0 - self.beta1))
             second.mul_(self.beta2)
@@ -82,6 +77,6 @@ class Adam:
             parameter.copy_(
                 (parameter.double() - first / denominator * self.step_size).float())
 
-    def step(self):
+    def step(self, scale):
         self.advance()
-        self.apply()
+        self.apply(scale)

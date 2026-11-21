@@ -74,6 +74,10 @@ def test_gradients_match_float_autograd():
                          lambda l: F.cross_entropy(l, targets), torch.randn(16, 50) * 2)
     assert_matches_float(lambda w: functions.embedding(w, indices),
                          lambda w: F.embedding(indices, w), torch.randn(50, 8))
+    key = torch.tensor(12345)
+    kept = functions.dropout(torch.ones(6, 40), key, 0.25)
+    assert_matches_float(lambda x: functions.dropout(x, key, 0.25),
+                         lambda x: x * kept, torch.randn(6, 40))
 
 
 def test_adam_matches_torch():
@@ -85,9 +89,9 @@ def test_adam_matches_torch():
     for _ in range(5):
         grad = torch.randn(20, 10)
         det_parameter.grad, float_parameter.grad = grad.clone(), grad.clone()
-        optim.clip_gradients([det_parameter], 0.25)
+        _, scale = optim.gradient_scale([det_parameter], 0.25)
         torch.nn.utils.clip_grad_norm_([float_parameter], 0.25)
-        det_adam.step()
+        det_adam.step(scale)
         float_adam.step()
     assert relative_error(det_parameter.data, float_parameter.data) < GRADIENT_TOLERANCE
 

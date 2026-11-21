@@ -1,7 +1,26 @@
+from functools import cache
+
 import torch
+
+from detzip.detops import fused
 
 UNIFORM_BITS = 24
 NORMAL_UNIFORMS = 12
+UINT64_MASK = (1 << 64) - 1
+KEEP_SOURCE = """
+template <typename T> T keep(T counter, T key) {
+    unsigned long long z = (unsigned long long)counter + (unsigned long long)key + GOLDENULL;
+    z = (z ^ (z >> 30)) * MIX_1ULL;
+    z = (z ^ (z >> 27)) * MIX_2ULL;
+    z = z ^ (z >> 31);
+    return (T)((z >> UNIFORM_SHIFT) >= THRESHOLDULL);
+}
+"""
+APPLY_KEEP_SOURCE = """
+template <typename T> T apply_keep(T x, T keep) {
+    return x * (keep != 0 ? (T)SCALE : (T)0.0);
+}
+"""
 
 
 def _signed(value):
@@ -24,11 +43,18 @@ def splitmix64(x):
     return z ^ _logical_shift_right(z, 31)
 
 
+def host_splitmix64(x):
+    z = (x + GOLDEN) & UINT64_MASK
+    z = ((z ^ (z >> 30)) * MIX_1) & UINT64_MASK
+    z = ((z ^ (z >> 27)) * MIX_2) & UINT64_MASK
+    return z ^ (z >> 31)
+
+
 def stream_key(*parts):
-    key = torch.zeros((), dtype=torch.int64)
+    key = 0
     for part in parts:
-        key = splitmix64(key ^ torch.tensor(_signed(part % (1 << 64)), dtype=torch.int64))
-    return int(key)
+        key = host_splitmix64(key ^ (part & UINT64_MASK))
+    return _signed(key)
 
 
 def uniform_integers(key, count, device):
@@ -36,12 +62,24 @@ def uniform_integers(key, count, device):
     return _logical_shift_right(splitmix64(counters), 64 - UNIFORM_BITS)
 
 
-def keep_mask(key, shape, drop_probability, device):
-    count = 1
-    for size in shape:
-        count *= size
+@cache
+def counters(count, device):
+    return torch.arange(count, dtype=torch.int64, device=device)
+
+
+def dropout(x, key, drop_probability):
     threshold = round(drop_probability * (1 << UNIFORM_BITS))
-    return (uniform_integers(key, count, device) >= threshold).reshape(shape)
+    if x.is_cuda:
+        keep = fused.kernel(
+            KEEP_SOURCE.replace("GOLDEN", hex(GOLDEN & UINT64_MASK))
+            .replace("MIX_1", hex(MIX_1 & UINT64_MASK)).replace("MIX_2", hex(MIX_2 & UINT64_MASK))
+            .replace("UNIFORM_SHIFT", str(64 - UNIFORM_BITS))
+            .replace("THRESHOLD", str(threshold)))(counters(x.numel(), x.device), key)
+        scale = torch.tensor(1.0 / (1.0 - drop_probability), dtype=torch.float32).item()
+        return fused.kernel(APPLY_KEEP_SOURCE.replace("SCALE", fused.literal(scale)))(
+            x, keep.reshape(x.shape))
+    keep = (uniform_integers(key, x.numel(), x.device) >= threshold).reshape(x.shape)
+    return x * (keep.float() * (1.0 / (1.0 - drop_probability)))
 
 
 def normal(key, shape, std):

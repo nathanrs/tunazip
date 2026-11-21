@@ -71,6 +71,9 @@ class DetTransformer(nn.Module):
         self.seed = config.seed
         self.dropout = config.dropout
         self.dropout_calls = 0
+        self.drops_this_forward = 0
+        self.register_buffer("dropout_keys", torch.zeros(
+            1 + 3 * config.n_layer, dtype=torch.int64), persistent=False)
         self.tok_emb = nn.Parameter(torch.empty(config.vocab_size, config.d_model))
         self.emb_norm = nn.Parameter(torch.ones(config.d_model))
         self.blocks = nn.ModuleList(
@@ -93,15 +96,21 @@ class DetTransformer(nn.Module):
                 parameter.copy_(rng.normal(
                     rng.stream_key(self.seed, INIT_DOMAIN, index), parameter.shape, std))
 
+    def next_dropout_keys(self):
+        keys = [rng.stream_key(self.seed, DROPOUT_DOMAIN, self.dropout_calls + index)
+                for index in range(len(self.dropout_keys))]
+        self.dropout_calls += len(keys)
+        self.dropout_keys.copy_(torch.tensor(keys, dtype=torch.int64))
+
     def drop(self, x):
         if not self.training or self.dropout == 0.0:
             return x
-        key = rng.stream_key(self.seed, DROPOUT_DOMAIN, self.dropout_calls)
-        self.dropout_calls += 1
-        keep = rng.keep_mask(key, x.shape, self.dropout, x.device)
-        return x * (keep.float() * (1.0 / (1.0 - self.dropout)))
+        key = self.dropout_keys[self.drops_this_forward]
+        self.drops_this_forward += 1
+        return functions.dropout(x, key, self.dropout)
 
     def forward(self, idx, output_positions):
+        self.drops_this_forward = 0
         seq = idx.size(1)
         cos, sin = self.rope_cos[:seq], self.rope_sin[:seq]
         causal_mask = self.causal_mask[:seq, :seq]

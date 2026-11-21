@@ -273,7 +273,7 @@ class Codec:
         if self.config.det:
             loss = det_functions.cross_entropy(logits, targets)
             loss.backward()
-            grad_norm = det_optim.clip_gradients(
+            grad_norm, scale = det_optim.gradient_scale(
                 list(self.model.parameters()), self.config.clip)
         else:
             loss = F.cross_entropy(logits, targets)
@@ -285,7 +285,10 @@ class Codec:
             for name, parameter in self.model.named_parameters():
                 tap(f"grad.{name}", parameter.grad)
             tap("grad_norm", grad_norm)
-        optimizer.step()
+        if self.config.det:
+            optimizer.step(scale)
+        else:
+            optimizer.step()
         if traced:
             for name, parameter in self.model.named_parameters():
                 tap(f"param.{name}", parameter)
@@ -314,6 +317,8 @@ class Codec:
             target_cols = start + np.arange(length)
             targets = torch.from_numpy(
                 file_data[stream_base[:, None] + target_cols[None, :] + 1]).to(self.device)
+            if config.det:
+                self.model.next_dropout_keys()
             with self.autocast():
                 logits = self.model(inp, slice(prefix_len, prefix_len + length))
             set_lr(self.retrain_optimizer,

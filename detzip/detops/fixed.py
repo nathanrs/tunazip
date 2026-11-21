@@ -1,10 +1,12 @@
+import math
+
 import torch
 
 from detzip.detops import fused
 
 MATMUL_BITS = 16
 SUM_FRACTION_BITS = 40
-SUM_MAX_TERMS = 2 ** 22
+INT64_SUM_BITS = 62
 SCALED_ROUND_SOURCE = """
 template <typename T> T scaled_round(T x, T scale) {
     return nearbyint(__dmul_rn(x, scale));
@@ -13,6 +15,19 @@ template <typename T> T scaled_round(T x, T scale) {
 SCALE_TWICE_SOURCE = """
 template <typename T> T scale_twice(T x, T first, T second) {
     return __dmul_rn(__dmul_rn(x, first), second);
+}
+"""
+PRODUCT_SOURCE = """
+template <typename T> T product(T a, T b) {
+    return __dmul_rn(a, b);
+}
+"""
+PEAK_SCALES_SOURCE = """
+template <typename T> void peak_scales(T peak, T& scale, T& inverse) {
+    int exponent;
+    frexp(peak, &exponent);
+    scale = __longlong_as_double(((long long)(BITS - exponent) + 1023LL) << 52);
+    inverse = __longlong_as_double(((long long)(exponent - BITS) + 1023LL) << 52);
 }
 """
 
@@ -33,15 +48,29 @@ def scale_twice(x, first, second):
     return x * first * second
 
 
-def quantize(x, dim, bits):
-    peak = x.abs().amax(dim=dim, keepdim=True)
+def product(a, b):
+    if a.is_cuda:
+        return fused.kernel(PRODUCT_SOURCE)(a, b)
+    return a.double() * b
+
+
+def peak_scales(peak, bits):
+    if peak.is_cuda:
+        return fused.kernel(PEAK_SCALES_SOURCE.replace("BITS", str(bits)), 2)(peak.double())
     shift = bits - torch.frexp(peak).exponent
-    return scaled_round(x, pow2(shift)), shift
+    return pow2(shift), pow2(-shift)
+
+
+def quantize(x, dim, bits):
+    peak = torch.linalg.vector_norm(x, ord=float("inf"), dim=dim, keepdim=True)
+    scale, inverse = peak_scales(peak, bits)
+    return scaled_round(x, scale), inverse
 
 
 def exact_sum(x, dim):
-    quantized, shift = quantize(x, dim, SUM_FRACTION_BITS)
-    if quantized.numel() // shift.numel() > SUM_MAX_TERMS:
-        raise ValueError("too many terms for an exact int64 sum")
+    dims = (dim,) if isinstance(dim, int) else dim
+    terms = math.prod(x.shape[d] for d in dims)
+    bits = min(SUM_FRACTION_BITS, INT64_SUM_BITS - (terms - 1).bit_length())
+    quantized, inverse = quantize(x, dim, bits)
     total = quantized.to(torch.int64).sum(dim=dim, keepdim=True)
-    return total.double() * pow2(-shift)
+    return product(total, inverse)

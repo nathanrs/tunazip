@@ -86,13 +86,15 @@ def op_hashes(device):
     adam = optim.Adam([parameter], lr=4e-5, betas=(0.0, 0.9999), eps=1e-9)
     for step in range(3):
         parameter.grad = wide_range(24 + step, (512, 256), device)
-        norm = optim.clip_gradients([parameter], 0.25)
-        adam.step()
+        norm, scale = optim.gradient_scale([parameter], 0.25)
+        adam.step(scale)
     record("adam", parameter)
     record("adam_second", adam.second[0])
     hashes["clip_norm"] = float(norm).hex()
 
-    record("dropout_mask", rng.keep_mask(rng.stream_key(95), (64, 48, 256), 0.25, device))
+    record("dropout", rng.dropout(
+        normal(27, (64, 48, 256), device),
+        torch.tensor(rng.stream_key(95), dtype=torch.int64, device=device), 0.25))
     cos, sin = rope_tables(48, 32)
     record("rope_cos", cos)
     record("rope_sin", sin)
