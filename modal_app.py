@@ -99,6 +99,8 @@ def run_fork(spec):
         decoded, result, run = codec.decode(str(payload), device, **options)
         result["decoded_matches"] = bool((decoded == tokens).all())
         result["decoded_sha"] = hashlib.sha256(decoded.tobytes()).hexdigest()[:16]
+        if not spec.get("max_tokens"):
+            result["restores_original_bytes"] = restores_original(spec["data"], decoded)
     if tracer is not None:
         tracer.write(run_dir / "trace.jsonl")
     with open(run_dir / "digests.jsonl", "w") as file:
@@ -144,6 +146,14 @@ class Runner:
             json.dumps(record))
         volume.commit()
         return record
+
+
+def restores_original(name, tokens):
+    token_path, restored = Path(f"/tmp/{name}.decoded.pp"), Path(f"/tmp/{name}.restored")
+    token_path.write_bytes(tokens.astype(">u2").tobytes())
+    subprocess.run([f"{DATA_DIR}/preprocess", "d", f"{DATA_DIR}/{name}.voc", str(token_path),
+                    str(restored)], check=True, stdout=subprocess.DEVNULL)
+    return restored.read_bytes() == Path(f"{DATA_DIR}/{name}").read_bytes()
 
 
 def git_state():
