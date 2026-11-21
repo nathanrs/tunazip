@@ -12,7 +12,7 @@ from detzip import codec
 
 PROFILED_STEPS = 3
 WARMUP_STEPS = 3
-TOP_OPERATIONS = 12
+TOP_OPERATIONS = 30
 
 
 def synchronize(device):
@@ -99,7 +99,9 @@ def bench(config, device, online_windows, steps, with_profile):
             run.model.train(name == "replay")
             entry = {"ms_per_step": time_steps(step, device, steps)}
             if with_profile:
+                run.graphs.enabled = False
                 entry["profile"] = profile_steps(step, device)
+                run.graphs.enabled = run.config.det and device.type == "cuda"
             results[f"{mode}.{name}"] = entry
     return results
 

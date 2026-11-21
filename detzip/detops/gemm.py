@@ -2,9 +2,10 @@ from dataclasses import dataclass
 
 import torch
 
-from detzip.detops.fixed import grid_round
+from detzip.detops.fixed import grid_round, integer_round, unshift
 
 FLOAT64_EXACT_INTEGER_LIMIT = 2 ** 53
+FLOAT32_EXACT_INTEGER_LIMIT = 2 ** 24
 
 
 @dataclass
@@ -20,8 +21,13 @@ BITS = Bits()
 def exact_matmul(a, b, bits_a, bits_b):
     if a.shape[:-2] != b.shape[:-2]:
         raise ValueError(f"batch shapes differ: {tuple(a.shape)} @ {tuple(b.shape)}")
-    if a.shape[-1] * 2 ** (bits_a + bits_b) > FLOAT64_EXACT_INTEGER_LIMIT:
+    largest_sum = a.shape[-1] * 2 ** (bits_a + bits_b)
+    if largest_sum > FLOAT64_EXACT_INTEGER_LIMIT:
         raise ValueError(f"inner dimension {a.shape[-1]} overflows the exact float64 range")
+    if a.is_cuda and largest_sum <= FLOAT32_EXACT_INTEGER_LIMIT:
+        quantized_a, shift_a = integer_round(a, -1, bits_a)
+        quantized_b, shift_b = integer_round(b, -2, bits_b)
+        return unshift(torch.matmul(quantized_a, quantized_b), shift_a, shift_b)
     return torch.matmul(grid_round(a, -1, bits_a), grid_round(b, -2, bits_b)).float()
 
 
