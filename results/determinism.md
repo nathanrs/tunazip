@@ -7,6 +7,8 @@
 - Float mode is bf16 autocast, the upstream setting.
 - Bytes are the modeled size of the token stream unless a row says payload.
 - Encodes ran on one H100.
+- Two recipes appear. The short-block recipe has 5,375-token blocks on 10 MB, which caps the online context at 82 tokens. The long-block recipe has 54,926-token blocks, which gives the full 192-token context. `scaling.md` measures the difference.
+- The round trips and the first bit-width tables use the short-block recipe.
 
 ## A file encoded on an H100 decodes byte-exactly on five other GPU types
 
@@ -32,22 +34,28 @@ Two cheaper checks run on every device before a round trip:
 
 ## Determinism costs no measurable bytes at 10 MB
 
-| Mode | Seed 1111 | Seed 2222 | Mean bytes |
-|---|---|---|---|
-| Float bf16 | 2,103,812 | 2,107,549 | 2,105,680 |
-| Deterministic, 16 bits | 2,101,163 | 2,100,320 | 2,100,742 |
+| Recipe | Mode | Seed 1111 | Seed 2222 | Mean bytes |
+|---|---|---|---|---|
+| Short blocks | Float bf16 | 2,103,812 | 2,107,549 | 2,105,680 |
+| Short blocks | Deterministic, 16 bits | 2,101,163 | 2,100,320 | 2,100,742 |
+| Long blocks | Float bf16 | 2,038,742 | 2,034,435 | 2,036,589 |
+| Long blocks | Deterministic, 16 bits | 2,037,784 | 2,042,855 | 2,040,320 |
 
-- The deterministic mean is 0.23% smaller than the float mean.
-- Two float seeds differ by 0.18%, so the two modes are within seed noise of each other.
+- With short blocks the deterministic mean is 0.23% smaller than the float mean.
+- With long blocks the deterministic mean is 0.18% larger than the float mean.
+- Two seeds of one mode differ by 0.04% to 0.25%, so the two modes are within seed noise of each other.
 - On the 1 MB slice the deterministic mean is 275,240 bytes against 275,180 for float, a difference of 0.02%.
 
-## Deterministic mode takes 1.5 to 2.2 times as long as float
+## Deterministic mode takes 3.0 to 3.4 times as long as float with full contexts
 
-| Slice | Float minutes | Deterministic minutes | Ratio |
-|---|---|---|---|
-| 1 MB | 3.3 to 3.7 | 6.5 | 1.8 to 2.0 |
-| 10 MB | 35.7 and 52.9 | 76.7 and 77.1 | 1.5 to 2.2 |
+| Slice | Recipe | Float minutes | Deterministic minutes | Ratio |
+|---|---|---|---|---|
+| 1 MB | Short blocks | 3.3 to 3.7 | 6.5 | 1.8 to 2.0 |
+| 10 MB | Short blocks | 35.7 and 52.9 | 76.7 and 77.1 | 1.5 to 2.2 |
+| 10 MB | Long blocks | 20.7 and 23.3 | 70.6 and 70.3 | 3.0 to 3.4 |
 
+- With long blocks most online steps see 192 tokens of context, and that step is where deterministic mode is slowest.
+- With short blocks the online steps see 41 tokens on average, so the ratio is lower.
 - Float wall time varies with the host CPU. Deterministic wall time varies by under 1%.
 - Per step on an H100, a replay step takes 37.1 ms deterministic and 15.7 ms float.
 - An online step over a 192-token window takes 62.8 ms deterministic and 16.9 ms float.
@@ -75,6 +83,23 @@ Each column is the number of significant bits kept for one matmul operand role. 
 - The two losses compound: 8-bit activations and weights with 12-bit gradients cost 7.9% to 11.6%.
 - The low-bit runs are unstable. Two seeds of 8/8/12 differ by 3.4%, against 0.04% at 16 bits.
 - Rows with one seed carry seed noise of a few tenths of a percent.
+
+## With full contexts 12-bit gradients cost 5.2%
+
+The same roles on 10 MB with the long-block recipe, seed 1111.
+
+| Activation bits | Weight bits | Gradient bits | Bytes | Against 16/16/16 |
+|---|---|---|---|---|
+| 16 | 16 | 16 | 2,037,784 | baseline |
+| 8 | 8 | 16 | 2,029,517 | −0.41% |
+| 12 | 12 | 16 | 2,047,024 | +0.45% |
+| 16 | 16 | 20 | 2,043,323 | +0.27% |
+| 16 | 16 | 12 | 2,144,017 | +5.21% |
+
+- 12-bit gradients cost 5.21% here, against 2.95% with short blocks.
+- 20-bit gradients do not beat 16-bit gradients.
+- 8-bit and 12-bit activations and weights stay within 0.5% of the baseline, on either side of it.
+- A second seed of 16/16/16 gives 2,042,855, which is 0.25% above the baseline.
 
 ## The 1 MB slice hides the gradient requirement
 
