@@ -95,6 +95,32 @@ The table runs the 100 MB recipe on the 10 MB slice, one seed, at the learning r
 - The learning rates were tuned for the scaled recipe.
 - The 10 MB sweep above measures model size under short contexts. The 100 MB runs do not have this limit.
 
+## With long blocks on 10 MB, 6×512 is best and 4×384 is 0.3% behind
+
+Float mode, 64 streams, the 100 MB recipe on the 10 MB slice. Each size ran three to five learning rates with seed 1111 and a second seed at the best rate.
+
+| Size | Parameters | Learning rate | Seed 1111 | Seed 2222 | Mean bytes | Behind best | Minutes |
+|---|---|---|---|---|---|---|---|
+| 2×256 | 3.7M | 6e-4 | 2,122,328 | 2,118,940 | 2,120,634 | +5.0% | 13 |
+| 4×384 | 10.4M | 2.5e-4 | 2,024,199 | 2,028,189 | 2,026,194 | +0.3% | 23 |
+| 6×512 | 23.5M | 3e-4 | 2,016,623 | 2,023,019 | 2,019,821 | best | 36 |
+| 8×640 | 45.4M | 5e-4 | 2,023,363 | 2,026,670 | 2,025,016 | +0.3% | 71 |
+| 12×768 | 93.0M | 8e-4 | 2,031,283 | 2,036,378 | 2,033,830 | +0.7% | 100 |
+| 12×1024 | 162.6M | 5e-4 | 2,039,288 | 2,041,723 | 2,040,506 | +1.0% | 131 |
+
+- Sizes from 4×384 to 12×1024 are within 1.0% of each other.
+- The upstream 12×1024 architecture is 1.0% behind 6×512 and takes 3.6 times as long.
+- 2×256 is 5.0% behind the best, against 5.9% with short blocks.
+- Two seeds of one size differ by 0.12% to 0.32%. Seed 2222 is the larger one at five of six sizes.
+- The best rate is bracketed at every size.
+- The best rate for 4×384 and 6×512 is a quarter of the short-block best.
+- Every run takes 41,317 replay steps, against 99,767 with short blocks. A large model gets fewer updates on the same 10 MB.
+- Minutes are from the seed 1111 run.
+
+![Compressed size by parameter count, long blocks](scaling-enwik8-10MB-long-blocks-parameters.png)
+
+![Compressed size by wall time, long blocks](scaling-enwik8-10MB-long-blocks-minutes.png)
+
 ## With long blocks, 256 streams cost 1.0% and 16 streams save 1.6%
 
 4×384 on 10 MB with the 100 MB recipe, seed 1111. The replay schedule is the same in every row and only the online learning rate varies.
@@ -104,7 +130,7 @@ The table runs the 100 MB recipe on the 10 MB slice, one seed, at the learning r
 | 16 | 3,432 | 191,605 | 5e-4, 1e-3, 2e-3 | 1e-3 | 2,005,343 | −1.64% | 54 |
 | 32 | 1,716 | 95,803 | 5e-4, 1e-3, 2e-3 | 1e-3 | 2,011,381 | −1.34% | 33 |
 | 64 | 858 | 47,902 | 1e-3 | 1e-3 | 2,038,742 | | 21 |
-| 128 | 429 | 23,951 | 1e-3, 2e-3, 4e-3 | 4e-3 | 2,032,322 | −0.31% | 20 |
+| 128 | 429 | 23,951 | 1e-3, 2e-3, 4e-3, 8e-3 | 4e-3 | 2,032,322 | −0.31% | 20 |
 | 256 | 214 | 11,976 | 1e-3, 2e-3, 4e-3, 8e-3 | 4e-3 | 2,059,578 | +1.02% | 23 |
 
 - The best online rate rises with the stream count: 1e-3 at 16 and 32 streams, 4e-3 at 128 and 256.
@@ -112,7 +138,7 @@ The table runs the 100 MB recipe on the 10 MB slice, one seed, at the learning r
 - Float wall time does not fall past 64 streams. Every row takes about 41,300 replay steps, and a float step costs the same at any batch size on an H100.
 - 16 streams take 2.6 times as long as 64 streams for 1.6% fewer bytes.
 - A second seed at 64 streams gives 2,034,435, so differences under 0.3% are noise.
-- The 128-stream best is the highest rate tried.
+- The best rate is bracketed at 16, 32, 128 and 256 streams. 128 streams at 8e-3 give 2,112,680 bytes.
 - The 11% to 13% loss of the short-block table came from the 19-token context, which long blocks remove.
 
 ## 54,926-token blocks are the best of five block lengths
@@ -209,4 +235,35 @@ The table shows the bytes written so far at five points of the 100 MB runs, read
 | 12×1024 | 162.6M | 0.0005 | 2,065,880 | 1.6527 | +0.5% | 148 |
 | 12×1024 | 162.6M | 0.001 | 2,059,870 | 1.6479 | +0.2% | 166 |
 
-Regenerate the plots and this table with `uv run python scripts/plot_scaling.py results/ledger.jsonl enwik8-10MB results`.
+Regenerate the plots and this table with `uv run python scripts/plot_scaling.py results/ledger.jsonl enwik8-10MB 5375 results/scaling-enwik8-10MB`.
+
+## All 24 runs of the long-block learning-rate sweep
+
+| Size | Parameters | Learning rate | Bytes | Bits per byte | Behind best | Minutes |
+|---|---|---|---|---|---|---|
+| 2×256 | 3.7M | 0.00015 | 2,158,697 | 1.7270 | +7.0% | 18 |
+| 2×256 | 3.7M | 0.0003 | 2,124,095 | 1.6993 | +5.3% | 12 |
+| 2×256 | 3.7M | 0.0006 | **2,122,328** | 1.6979 | +5.2% | 13 |
+| 2×256 | 3.7M | 0.0012 | 2,128,139 | 1.7025 | +5.5% | 10 |
+| 2×256 | 3.7M | 0.0024 | 2,145,609 | 1.7165 | +6.4% | 14 |
+| 4×384 | 10.4M | 0.000125 | 2,046,637 | 1.6373 | +1.5% | 24 |
+| 4×384 | 10.4M | 0.00025 | **2,024,199** | 1.6194 | +0.4% | 23 |
+| 4×384 | 10.4M | 0.0005 | 2,031,101 | 1.6249 | +0.7% | 24 |
+| 4×384 | 10.4M | 0.001 | 2,038,742 | 1.6310 | +1.1% | 21 |
+| 4×384 | 10.4M | 0.002 | 2,042,738 | 1.6342 | +1.3% | 21 |
+| 6×512 | 23.5M | 0.00015 | 2,016,985 | 1.6136 | +0.0% | 37 |
+| 6×512 | 23.5M | 0.0003 | **2,016,623** | 1.6133 | best | 36 |
+| 6×512 | 23.5M | 0.0006 | 2,022,219 | 1.6178 | +0.3% | 36 |
+| 6×512 | 23.5M | 0.0012 | 2,031,852 | 1.6255 | +0.8% | 41 |
+| 6×512 | 23.5M | 0.0024 | 2,034,908 | 1.6279 | +0.9% | 37 |
+| 8×640 | 45.4M | 0.00025 | 2,023,650 | 1.6189 | +0.3% | 55 |
+| 8×640 | 45.4M | 0.0005 | **2,023,363** | 1.6187 | +0.3% | 71 |
+| 8×640 | 45.4M | 0.001 | 2,033,456 | 1.6268 | +0.8% | 71 |
+| 12×768 | 93.0M | 0.0004 | 2,033,490 | 1.6268 | +0.8% | 98 |
+| 12×768 | 93.0M | 0.0008 | **2,031,283** | 1.6250 | +0.7% | 100 |
+| 12×768 | 93.0M | 0.0016 | 2,053,854 | 1.6431 | +1.8% | 97 |
+| 12×1024 | 162.6M | 0.00025 | 2,043,033 | 1.6344 | +1.3% | 134 |
+| 12×1024 | 162.6M | 0.0005 | **2,039,288** | 1.6314 | +1.1% | 131 |
+| 12×1024 | 162.6M | 0.001 | 2,042,605 | 1.6341 | +1.3% | 131 |
+
+Regenerate the plots and this table with `uv run python scripts/plot_scaling.py results/ledger.jsonl enwik8-10MB 54926 results/scaling-enwik8-10MB-long-blocks`.

@@ -75,23 +75,24 @@ Activation / weight / gradient bits, 4×384, 10 MB, against 16/16/16.
 
 - Float mode, one seed per size.
 - 4×384 is 0.4% behind 6×512 after 1.1M tokens and 3.1% behind after 31.3M tokens.
-- The learning rates came from the short-block 10 MB sweep. The long-block 10 MB sweep prefers a lower rate for 4×384 and 6×512.
+- The learning rates came from the short-block 10 MB sweep. The long-block 10 MB sweep prefers a quarter of that rate for 4×384 and 6×512.
 
-## On 10 MB with long blocks, sizes from 4×384 to 12×1024 are within 1.1%
+## On 10 MB with long blocks, sizes from 4×384 to 12×1024 are within 1.0%
 
-Float mode, 64 streams, best of three to five learning rates, seed 1111.
+Float mode, 64 streams, best of three to five learning rates, mean of two seeds.
 
-| Size | Parameters | Learning rate | Bytes | Behind best | Minutes |
+| Size | Parameters | Learning rate | Mean bytes | Behind best | Minutes |
 |---|---|---|---|---|---|
-| 2×256 | 3.7M | 6e-4 | 2,122,328 | +5.2% | 13 |
-| 4×384 | 10.4M | 2.5e-4 | 2,024,199 | +0.4% | 23 |
-| 6×512 | 23.5M | 3e-4 | 2,016,623 | best | 36 |
-| 8×640 | 45.4M | 5e-4 | 2,023,363 | +0.3% | 71 |
-| 12×768 | 93.0M | 8e-4 | 2,031,283 | +0.7% | 100 |
-| 12×1024 | 162.6M | 5e-4 | 2,039,288 | +1.1% | 131 |
+| 2×256 | 3.7M | 6e-4 | 2,120,634 | +5.0% | 13 |
+| 4×384 | 10.4M | 2.5e-4 | 2,026,194 | +0.3% | 23 |
+| 6×512 | 23.5M | 3e-4 | 2,019,821 | best | 36 |
+| 8×640 | 45.4M | 5e-4 | 2,025,016 | +0.3% | 71 |
+| 12×768 | 93.0M | 8e-4 | 2,033,830 | +0.7% | 100 |
+| 12×1024 | 162.6M | 5e-4 | 2,040,506 | +1.0% | 131 |
 
-- The upstream 12×1024 architecture is the slowest and the second worst on 10 MB.
-- Seed noise is 0.2% to 0.8%, so the order from 4×384 to 12×1024 is not settled by one seed.
+- The upstream 12×1024 architecture is 1.0% behind 6×512 and takes 3.6 times as long.
+- Two seeds of one size differ by 0.12% to 0.32%.
+- Every run takes 41,317 replay steps, against 99,767 with short blocks.
 
 ## The token-scaled recipe starves small files of context
 
@@ -116,4 +117,3 @@ Float mode, 64 streams, best of three to five learning rates, seed 1111.
 
 - The 100 MB decode on a B200.
 - A second float seed on 100 MB.
-- Second seeds for the long-block 10 MB size table.
