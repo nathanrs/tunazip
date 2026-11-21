@@ -273,8 +273,8 @@ class Codec:
         if self.config.det:
             loss = det_functions.cross_entropy(logits, targets)
             loss.backward()
-            grad_norm = torch.tensor(det_optim.clip_gradients(
-                list(self.model.parameters()), self.config.clip))
+            grad_norm = det_optim.clip_gradients(
+                list(self.model.parameters()), self.config.clip)
         else:
             loss = F.cross_entropy(logits, targets)
             loss.backward()

@@ -4,6 +4,7 @@ from math import factorial
 
 import torch
 
+from detzip.detops import fused
 from detzip.detops.fixed import pow2
 
 INV_LN2 = float.fromhex("0x1.71547652b82fep+0")
@@ -15,7 +16,25 @@ HOST_CONTEXT = Context(prec=60)
 HOST_EPSILON = Decimal(10) ** -55
 
 
+EXP_STATEMENTS = f"""
+    x = x < -{fused.literal(EXP_INPUT_LIMIT)} ? -{fused.literal(EXP_INPUT_LIMIT)}
+        : (x > {fused.literal(EXP_INPUT_LIMIT)} ? {fused.literal(EXP_INPUT_LIMIT)} : x);
+    T k = nearbyint(__dmul_rn(x, {fused.literal(INV_LN2)}));
+    T r = __dadd_rn(x, -__dmul_rn(k, {fused.literal(LN2_HI)}));
+    r = __dadd_rn(r, -__dmul_rn(k, {fused.literal(LN2_LO)}));
+    T p = {fused.literal(EXP_COEFFICIENTS[-1])};
+""" + "".join(f"    p = __dadd_rn(__dmul_rn(p, r), {fused.literal(coefficient)});\n"
+              for coefficient in reversed(EXP_COEFFICIENTS[:-1])) + """
+    T e = __dmul_rn(p, __longlong_as_double(((long long)k + 1023LL) << 52));
+"""
+EXP_SOURCE = "template <typename T> T det_exp(T x) {" + EXP_STATEMENTS + "    return e;\n}"
+SIGMOID_SOURCE = ("template <typename T> T det_sigmoid(T v) {\n    T x = -v;" + EXP_STATEMENTS
+                  + "    return 1.0 / __dadd_rn(1.0, e);\n}")
+
+
 def exp64(x):
+    if x.is_cuda:
+        return fused.kernel(EXP_SOURCE)(x)
     x = x.clamp(-EXP_INPUT_LIMIT, EXP_INPUT_LIMIT)
     k = torch.round(x * INV_LN2)
     r = x - k * LN2_HI
@@ -28,6 +47,8 @@ def exp64(x):
 
 
 def sigmoid64(x):
+    if x.is_cuda:
+        return fused.kernel(SIGMOID_SOURCE)(x)
     return 1.0 / (1.0 + exp64(-x))
 
 

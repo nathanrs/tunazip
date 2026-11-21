@@ -117,8 +117,17 @@ def run_selftest(spec):
             "experiments": selftest.fast_path_experiments(device)}
 
 
+def run_bench(spec):
+    import torch
+    from detzip.codec import Config
+    from scripts.bench_step import bench
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return bench(Config(**spec["config"]), device, spec.get("online_windows", [192]),
+                 spec.get("steps", 10), spec.get("profile", False))
+
+
 KINDS = {"prepare": run_prepare, "upstream": run_upstream, "fork": run_fork,
-         "selftest": run_selftest}
+         "selftest": run_selftest, "bench": run_bench}
 
 
 @app.cls(image=image, volumes={"/vol": volume}, timeout=24 * 3600)

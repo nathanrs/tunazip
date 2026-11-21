@@ -10,7 +10,7 @@ class RMSNormFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, weight):
         x64, weight64 = x.double(), weight.double()
-        mean_square = exact_sum(x64 * x64, -1) / x.shape[-1]
+        mean_square = exact_sum(x64 * x64, -1) * (1.0 / x.shape[-1])
         inverse_rms = 1.0 / torch.sqrt(mean_square + RMS_EPSILON)
         ctx.save_for_backward(x, weight, inverse_rms)
         return (x64 * inverse_rms * weight64).float()
@@ -20,7 +20,7 @@ class RMSNormFunction(torch.autograd.Function):
         x, weight, inverse_rms = ctx.saved_tensors
         x64, grad64 = x.double(), grad.double()
         scaled = grad64 * weight.double()
-        projection = exact_sum(scaled * x64, -1) / x.shape[-1]
+        projection = exact_sum(scaled * x64, -1) * (1.0 / x.shape[-1])
         grad_x = scaled * inverse_rms - x64 * (inverse_rms * inverse_rms * inverse_rms) * projection
         leading = tuple(range(x.dim() - 1))
         grad_weight = exact_sum(grad64 * x64 * inverse_rms, leading).reshape(weight.shape)
@@ -89,7 +89,8 @@ class CrossEntropyFunction(torch.autograd.Function):
     def backward(ctx, grad):
         probabilities, targets = ctx.saved_tensors
         one_hot = torch.zeros_like(probabilities).scatter_(-1, targets[:, None], 1.0)
-        return ((probabilities - one_hot) / probabilities.shape[0] * grad.double()).float(), None
+        scale = 1.0 / probabilities.shape[0]
+        return ((probabilities - one_hot) * scale * grad.double()).float(), None
 
 
 def cross_entropy(logits, targets):

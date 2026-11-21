@@ -44,9 +44,12 @@ def op_hashes(device):
     record("exp64", exp64(sweep))
     record("sigmoid64", sigmoid64(sweep))
     record("sqrt_div", 1.0 / torch.sqrt(sweep * sweep + 1e-5))
+    record("reciprocal_scale", sweep * (1.0 / 384))
+    record("tensor_div", torch.sqrt(sweep * sweep + 1e-5)
+           / torch.tensor(0.7310585786300049, dtype=torch.float64, device=device))
 
-    x = normal(13, (8, 48, 256), device).requires_grad_()
-    gain = (normal(14, (256,), device, 0.1) + 1.0).requires_grad_()
+    x = normal(13, (8, 48, 384), device).requires_grad_()
+    gain = (normal(14, (384,), device, 0.1) + 1.0).requires_grad_()
     out = functions.rms_norm(x, gain)
     out.backward(normal(15, tuple(out.shape), device))
     record("rms_norm", out)
@@ -58,6 +61,7 @@ def op_hashes(device):
     out = functions.masked_softmax(scores, mask)
     out.backward(normal(17, tuple(out.shape), device))
     record("softmax", out)
+    record("softmax64", functions.softmax64(scores.detach(), mask))
     record("softmax_grad", scores.grad)
 
     x = normal(18, (8, 48, 256), device, 4.0).requires_grad_()
@@ -66,8 +70,8 @@ def op_hashes(device):
     record("silu", out)
     record("silu_grad", x.grad)
 
-    logits = normal(20, (64, 4098), device, 2.0).requires_grad_()
-    targets = (rng.uniform_integers(rng.stream_key(97), 64, device) % 4098)
+    logits = normal(20, (48, 4098), device, 2.0).requires_grad_()
+    targets = (rng.uniform_integers(rng.stream_key(97), 48, device) % 4098)
     functions.cross_entropy(logits, targets).backward()
     record("cross_entropy_grad", logits.grad)
     record("freq_softmax", torch.round(functions.softmax64(logits.detach()) * 10_000_000))
@@ -85,6 +89,7 @@ def op_hashes(device):
         norm = optim.clip_gradients([parameter], 0.25)
         adam.step()
     record("adam", parameter)
+    record("adam_second", adam.second[0])
     hashes["clip_norm"] = float(norm).hex()
 
     record("dropout_mask", rng.keep_mask(rng.stream_key(95), (64, 48, 256), 0.25, device))
