@@ -52,7 +52,7 @@ The plots show the seed 1111 runs.
 - The upstream online rate of 4e-5 is the worst of the five rates tried at 12×1024.
 - Doubling the best rate costs between 0.02% (4×384) and 1.1% (12×768).
 
-## 256 streams cost 11% to 13% more bytes than 64
+## With short blocks, 256 streams cost 11% to 13% more bytes than 64
 
 | Size | Streams | Learning rate | Bytes | Against 64 streams | Minutes |
 |---|---|---|---|---|---|
@@ -94,6 +94,42 @@ The table runs the 100 MB recipe on the 10 MB slice, one seed, at the learning r
 - 4×384 is 0.4% behind 12×768 with the 100 MB recipe, against 1.9% with the scaled recipe.
 - The learning rates were tuned for the scaled recipe.
 - The 10 MB sweep above measures model size under short contexts. The 100 MB runs do not have this limit.
+
+## With long blocks, 256 streams cost 1.0% and 16 streams save 1.6%
+
+4×384 on 10 MB with the 100 MB recipe, seed 1111. The replay schedule is the same in every row and only the online learning rate varies.
+
+| Streams | Tokens per stream in a block | Online steps | Online rates tried | Best rate | Bytes | Against 64 streams | Minutes |
+|---|---|---|---|---|---|---|---|
+| 16 | 3,432 | 191,605 | 5e-4, 1e-3, 2e-3 | 1e-3 | 2,005,343 | −1.64% | 54 |
+| 32 | 1,716 | 95,803 | 5e-4, 1e-3, 2e-3 | 1e-3 | 2,011,381 | −1.34% | 33 |
+| 64 | 858 | 47,902 | 1e-3 | 1e-3 | 2,038,742 | | 21 |
+| 128 | 429 | 23,951 | 1e-3, 2e-3, 4e-3 | 4e-3 | 2,032,322 | −0.31% | 20 |
+| 256 | 214 | 11,976 | 1e-3, 2e-3, 4e-3, 8e-3 | 4e-3 | 2,059,578 | +1.02% | 23 |
+
+- The best online rate rises with the stream count: 1e-3 at 16 and 32 streams, 4e-3 at 128 and 256.
+- 256 streams at the 64-stream rate of 1e-3 give 2,144,115 bytes, 5.2% more than 64 streams.
+- Float wall time does not fall past 64 streams. Every row takes about 41,300 replay steps, and a float step costs the same at any batch size on an H100.
+- 16 streams take 2.6 times as long as 64 streams for 1.6% fewer bytes.
+- A second seed at 64 streams gives 2,034,435, so differences under 0.3% are noise.
+- The 128-stream best is the highest rate tried.
+- The 11% to 13% loss of the short-block table came from the 19-token context, which long blocks remove.
+
+## 54,926-token blocks are the best of five block lengths
+
+4×384 on 10 MB, 64 streams, learning rate 1e-3, seed 1111. Only the block length changes.
+
+| Block length | Tokens per stream in a block | Replay steps | Bytes | Against 54,926 | Minutes |
+|---|---|---|---|---|---|
+| 13,731 | 214 | 167,132 | 2,076,864 | +1.87% | 55 |
+| 27,463 | 429 | 83,388 | 2,054,818 | +0.79% | 35 |
+| 54,926 | 858 | 41,317 | 2,038,742 | | 21 |
+| 109,852 | 1,716 | 20,282 | 2,058,500 | +0.97% | 18 |
+| 219,704 | 3,432 | 9,765 | 2,081,062 | +2.08% | 21 |
+
+- A replay runs after every block, so half the block length means twice the replay steps.
+- Four times the replay steps cost 1.87% more bytes and 34 more minutes.
+- The replay learning-rate schedule counts replay steps and was not rescaled, so a run with more replay steps also ends at a lower replay rate. The table measures both changes together.
 
 ## On the full 100 MB, 6×512 is 3.0% ahead of 4×384
 
