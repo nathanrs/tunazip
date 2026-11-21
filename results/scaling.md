@@ -90,7 +90,7 @@ The table runs the 100 MB recipe on the 10 MB slice, one seed, at the learning r
 | 6×512 | 2,086,817 | 2,031,852 | −2.6% | 54 | 41 |
 | 12×768 | 2,065,528 | 2,031,283 | −1.7% | 116 | 100 |
 
-- The 100 MB recipe also takes 41,317 replay steps where the scaled recipe takes about 106,000, so the runs are shorter.
+- The 100 MB recipe also takes 41,317 replay steps where the scaled recipe takes 99,767, so the runs are shorter.
 - 4×384 is 0.4% behind 12×768 with the 100 MB recipe, against 1.9% with the scaled recipe.
 - The learning rates were tuned for the scaled recipe.
 - The 10 MB sweep above measures model size under short contexts. The 100 MB runs do not have this limit.
