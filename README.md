@@ -64,6 +64,8 @@ Decode it on a B200 and compare with the original bytes:
 
 A decode takes about as long as the encode, 7 minutes each here. Every run used torch 2.15.0, and other versions are untested.
 
-## Credits
+## License and credits
 
-tunazip derives from tufazip, Fabrice Bellard's NNCP preprocessor and Project Nayuki's reference arithmetic coder, all MIT-licensed. See [NOTICE](NOTICE).
+tunazip is MIT-licensed. See [LICENSE](LICENSE).
+
+It derives from tufazip, Fabrice Bellard's NNCP preprocessor and Project Nayuki's reference arithmetic coder, all MIT-licensed. See [NOTICE](NOTICE).
