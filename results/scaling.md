@@ -194,6 +194,7 @@ The table shows the bytes written so far at five points of the 100 MB runs, read
 
 | Compressor | Bytes |
 |---|---|
+| zip -9 | 36,445,385 |
 | gzip -9 | 36,475,811 |
 | bzip2 -9 | 29,008,758 |
 | zstd -19 | 26,944,227 |
