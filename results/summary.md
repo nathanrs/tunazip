@@ -22,7 +22,7 @@ detzip is a fork of tufazip whose compressed files decode byte-exactly on a diff
 ## A float-mode file decodes only on the GPU type that encoded it
 
 - A 1 MB file encoded in float mode on an H100 decodes on a second H100.
-- On B200, A100, L40S and A10 the decoder goes wrong within the first three tokens and gets over 99.9% of the 268,011 tokens wrong.
+- On B200, A100, L40S, A10 and T4 the decoder goes wrong within the first three tokens and gets over 99.9% of the 268,011 tokens wrong.
 
 ## A file encoded on an H100 decodes byte-exactly on five other GPU types
 

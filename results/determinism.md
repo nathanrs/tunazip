@@ -21,11 +21,12 @@ The first 1 MB of enwik8, encoded in float mode on an H100. The payload is 276,1
 | A100 | Ampere | no | 1 | 267,988 |
 | L40S | Ada | no | 1 | 267,966 |
 | A10 | Ampere | no | 1 | 267,975 |
+| T4 | Turing | no | 1 | 267,911 |
 
-- On the four other GPU types the decoder goes wrong within the first three tokens and gets over 99.9% of the file wrong.
+- On the five other GPU types the decoder goes wrong within the first three tokens and gets over 99.9% of the file wrong.
 - On the A100 the logits of the first forward pass already differ from the encoder's.
 - On the B200 the first step matches the encoder, and the first wrong token is two steps later.
-- The second H100 reproduces the encoder's parameter hash at every checkpoint. Float mode repeats on the same GPU model with the same software, and nothing guarantees that.
+- The second H100 reproduces the encoder's parameter hash at every checkpoint. This is one pair of machines with the same GPU model and the same software.
 - The model, recipe and seed are the ones of the deterministic 1 MB round trip below.
 
 ## A file encoded on an H100 decodes byte-exactly on five other GPU types
