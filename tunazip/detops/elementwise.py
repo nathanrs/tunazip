@@ -4,8 +4,8 @@ from math import factorial
 
 import torch
 
-from detzip.detops import fused
-from detzip.detops.fixed import pow2
+from tunazip.detops import fused
+from tunazip.detops.fixed import pow2
 
 INV_LN2 = float.fromhex("0x1.71547652b82fep+0")
 LN2_HI = float.fromhex("0x1.62e42fee00000p-1")

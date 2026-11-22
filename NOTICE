@@ -1,10 +1,10 @@
 This repository contains code derived from MIT-licensed projects.
 
 - tufazip: Copyright (c) 2026 Tommy He. https://github.com/Tufalabs/tufazip
-  `detzip/codec.py` is derived from `nn.py` at commit b9d678d.
+  `tunazip/codec.py` is derived from `nn.py` at commit b9d678d.
   License text: licenses/tufazip-LICENSE
 - NNCP preprocessor: Copyright (c) 2018-2019 Fabrice Bellard. https://bellard.org/nncp/
-  `detzip/preprocess.c` is copied unmodified; it contains its license notice.
+  `tunazip/preprocess.c` is copied unmodified; it contains its license notice.
 - Reference arithmetic coding: Copyright (c) Project Nayuki.
   https://github.com/nayuki/Reference-arithmetic-coding
-  `detzip/arithmetic_coder.py` is copied from tufazip, which adapted it.
+  `tunazip/arithmetic_coder.py` is copied from tufazip, which adapted it.

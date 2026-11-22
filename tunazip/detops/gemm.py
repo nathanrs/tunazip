@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import torch
 
-from detzip.detops.fixed import grid_round
+from tunazip.detops.fixed import grid_round
 
 FLOAT64_EXACT_INTEGER_LIMIT = 2 ** 53
 

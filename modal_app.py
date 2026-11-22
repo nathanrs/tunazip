@@ -21,7 +21,7 @@ image = (
     .run_commands(
         f"git clone https://github.com/Tufalabs/tufazip {UPSTREAM_DIR}",
         f"git -C {UPSTREAM_DIR} checkout {UPSTREAM_COMMIT}")
-    .add_local_dir("detzip", "/root/detzip")
+    .add_local_dir("tunazip", "/root/tunazip")
     .add_local_dir("scripts", "/root/scripts")
 )
 
@@ -34,7 +34,7 @@ def environment():
 
 
 def load_data(name, max_tokens):
-    from detzip.codec import load_tokens
+    from tunazip.codec import load_tokens
     meta = json.loads(Path(f"{DATA_DIR}/{name}.json").read_text())
     tokens = load_tokens(f"{DATA_DIR}/{name}.pp")
     return meta, tokens[:max_tokens] if max_tokens else tokens
@@ -42,12 +42,12 @@ def load_data(name, max_tokens):
 
 def run_prepare(spec):
     from scripts.prepare_data import prepare
-    return prepare(DATA_DIR, "/root/detzip/preprocess.c", spec["slices"])
+    return prepare(DATA_DIR, "/root/tunazip/preprocess.c", spec["slices"])
 
 
 def run_upstream(spec):
     from dataclasses import asdict
-    from detzip.codec import Config
+    from tunazip.codec import Config
     meta, tokens = load_data(spec["data"], spec.get("max_tokens"))
     config = Config(vocab_size=meta["vocab_size"], **spec.get("config", {}))
     arguments = ["--input", f"{DATA_DIR}/{spec['data']}.pp", "--no_coding",
@@ -75,7 +75,7 @@ def run_upstream(spec):
 def run_fork(spec):
     import hashlib
     import torch
-    from detzip import codec, trace
+    from tunazip import codec, trace
     meta, tokens = load_data(spec["data"], spec.get("max_tokens"))
     config = codec.Config(vocab_size=meta["vocab_size"], **spec.get("config", {}))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -117,7 +117,7 @@ def run_fork(spec):
 
 def run_selftest(spec):
     import torch
-    from detzip.detops import selftest
+    from tunazip.detops import selftest
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return {"hashes": selftest.op_hashes(device),
             "experiments": selftest.fast_path_experiments(device)}
@@ -125,7 +125,7 @@ def run_selftest(spec):
 
 def run_bench(spec):
     import torch
-    from detzip.codec import Config
+    from tunazip.codec import Config
     from scripts.bench_step import bench
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return bench(Config(**spec["config"]), device, spec.get("online_windows", [192]),

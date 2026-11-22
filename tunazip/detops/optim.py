@@ -2,8 +2,8 @@ import math
 
 import torch
 
-from detzip.detops import fused
-from detzip.detops.fixed import exact_sum, product
+from tunazip.detops import fused
+from tunazip.detops.fixed import exact_sum, product
 
 CLIP_EPSILON = 1e-6
 ADAM_SOURCE = """

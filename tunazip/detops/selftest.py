@@ -1,9 +1,9 @@
 import torch
 
-from detzip import trace
-from detzip.detops import functions, gemm, optim, rng
-from detzip.detops.elementwise import exp64, host_cos_of_pi_times, rope_tables, sigmoid64
-from detzip.detops.fixed import exact_sum, pow2
+from tunazip import trace
+from tunazip.detops import functions, gemm, optim, rng
+from tunazip.detops.elementwise import exp64, host_cos_of_pi_times, rope_tables, sigmoid64
+from tunazip.detops.fixed import exact_sum, pow2
 
 
 def normal(key, shape, device, std=1.0):

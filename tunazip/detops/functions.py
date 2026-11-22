@@ -1,8 +1,8 @@
 import torch
 
-from detzip.detops import fused, rng
-from detzip.detops.elementwise import exp64, sigmoid64
-from detzip.detops.fixed import (SUM_FRACTION_BITS, exact_sum, product, quantize,
+from tunazip.detops import fused, rng
+from tunazip.detops.elementwise import exp64, sigmoid64
+from tunazip.detops.fixed import (SUM_FRACTION_BITS, exact_sum, product, quantize,
                                  scale_twice)
 
 RMS_EPSILON = 1e-5

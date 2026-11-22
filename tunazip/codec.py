@@ -8,16 +8,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from detzip import trace
-from detzip.detmodel import DetTransformer
-from detzip.detops import gemm as det_gemm
-from detzip.detops import functions as det_functions
-from detzip.detops import optim as det_optim
-from detzip.detops.elementwise import host_cos_of_pi_times
-from detzip.graphs import GraphCache
-from detzip.arithmetic_coder import (ArithmeticDecoder, ArithmeticEncoder,
+from tunazip import trace
+from tunazip.detmodel import DetTransformer
+from tunazip.detops import gemm as det_gemm
+from tunazip.detops import functions as det_functions
+from tunazip.detops import optim as det_optim
+from tunazip.detops.elementwise import host_cos_of_pi_times
+from tunazip.graphs import GraphCache
+from tunazip.arithmetic_coder import (ArithmeticDecoder, ArithmeticEncoder,
                                      BitInputStream, BitOutputStream)
-from detzip.trace import tap
+from tunazip.trace import tap
 
 LOG2 = math.log(2.0)
 FREQ_TOTAL = 10_000_000

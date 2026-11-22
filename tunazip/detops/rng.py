@@ -2,7 +2,7 @@ from functools import cache
 
 import torch
 
-from detzip.detops import fused
+from tunazip.detops import fused
 
 UNIFORM_BITS = 24
 NORMAL_UNIFORMS = 12

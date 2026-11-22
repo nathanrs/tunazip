@@ -1,6 +1,6 @@
-# detzip results
+# tunazip results
 
-detzip is a fork of tufazip whose compressed files decode byte-exactly on a different GPU. Details are in [determinism.md](determinism.md) and [scaling.md](scaling.md).
+tunazip is a fork of tufazip whose compressed files decode byte-exactly on a different GPU. Details are in [determinism.md](determinism.md) and [scaling.md](scaling.md).
 
 ## Determinism costs 0.10% of the bytes and 2.9 to 3.3 times the time on enwik8
 

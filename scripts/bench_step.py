@@ -8,7 +8,7 @@ import torch
 from torch.autograd import DeviceType
 from torch.profiler import ProfilerActivity, profile
 
-from detzip import codec
+from tunazip import codec
 
 PROFILED_STEPS = 3
 WARMUP_STEPS = 3

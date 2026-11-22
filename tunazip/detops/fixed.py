@@ -2,7 +2,7 @@ import math
 
 import torch
 
-from detzip.detops import fused
+from tunazip.detops import fused
 
 SUM_FRACTION_BITS = 40
 INT64_SUM_BITS = 62

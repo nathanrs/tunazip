@@ -3,9 +3,9 @@ import math
 import torch
 import torch.nn as nn
 
-from detzip.detops import functions, gemm, rng
-from detzip.detops.elementwise import rope_tables
-from detzip.trace import tap
+from tunazip.detops import functions, gemm, rng
+from tunazip.detops.elementwise import rope_tables
+from tunazip.trace import tap
 
 INIT_STD = 0.02
 INIT_DOMAIN = 1

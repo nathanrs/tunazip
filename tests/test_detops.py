@@ -4,8 +4,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from detzip import codec
-from detzip.detops import functions, gemm, optim, selftest
+from tunazip import codec
+from tunazip.detops import functions, gemm, optim, selftest
 
 GRADIENT_TOLERANCE = 1e-6
 MATMUL_BITS = 16
