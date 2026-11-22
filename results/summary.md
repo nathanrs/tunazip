@@ -2,17 +2,19 @@
 
 detzip is a fork of tufazip whose compressed files decode byte-exactly on a different GPU. Details are in [determinism.md](determinism.md) and [scaling.md](scaling.md).
 
-## Determinism costs 0.20% of the bytes and 3.3 times the time on enwik8
+## Determinism costs 0.10% of the bytes and 2.9 to 3.3 times the time on enwik8
 
 4×384 (10.4M parameters), 64 streams, random initial weights, one H100, all 100,000,000 bytes of enwik8.
 
-| Mode | Modeled bytes | Bits per byte | Minutes |
-|---|---|---|---|
-| Float bf16 | 16,362,011 | 1.3090 | 329 |
-| Deterministic, 16 bits | 16,394,464 | 1.3116 | 1,076 |
+| Mode | Seed | Modeled bytes | Bits per byte | Minutes |
+|---|---|---|---|---|
+| Float bf16 | 1111 | 16,362,011 | 1.3090 | 329 |
+| Float bf16 | 2222 | 16,394,003 | 1.3115 | 372 |
+| Deterministic, 16 bits | 1111 | 16,394,464 | 1.3116 | 1,076 |
 
-- Bytes lost to determinism: 32,453, which is 0.20%. One seed per mode, and seed noise is about 0.15%.
-- Slowdown from determinism: 3.27 times.
+- Bytes lost to determinism: 16,457 against the float mean of 16,378,007, which is 0.10%.
+- The two float seeds differ by 0.20%, so the loss is inside seed noise. The deterministic run has one seed.
+- Slowdown from determinism: 3.27 times against float seed 1111 and 2.89 times against float seed 2222. Float wall time varies with the host CPU.
 - The deterministic file is 16,424,127 bytes with its dictionary, 1.3139 bits per byte. xz -9e gives 24,831,656 bytes.
 - On 10 MB with two seeds per mode, the deterministic mean is 0.18% larger than float with long blocks and 0.23% smaller with short blocks. Both are inside seed noise.
 - On 10 MB with full contexts the slowdown is 3.0 to 3.4 times.
@@ -62,7 +64,7 @@ Activation / weight / gradient bits, 4×384, 10 MB, against 16/16/16.
 - 12-bit gradients cost 3% to 5% on 10 MB and nothing on 1 MB. A bit width has to be checked at the size of the file.
 - 8-bit activations and weights stay within seed noise of 16 bits.
 - 20-bit gradients do not beat 16-bit gradients on 10 MB.
-- On 100 MB a 22-bit-gradient run was 0.41% ahead of the 16-bit run when it was stopped at 21.09M tokens. One seed each.
+- On 100 MB a 22-bit-gradient run was 0.41% ahead of the 16-bit run when it was stopped at 21.09M tokens. One seed each, and two float seeds end 0.20% apart.
 - Lower bit widths buy no speed on an H100. A float32 forward matmul moved the replay step from 37.1 ms to 36.5 ms.
 
 ## On 100 MB, 6×512 is 3.0% smaller than 4×384 and matches 12×768
@@ -73,7 +75,7 @@ Activation / weight / gradient bits, 4×384, 10 MB, against 16/16/16.
 | 6×512 | 23.5M | 15,867,295 | 1.2694 | 543 | H100 |
 | 12×768 | 93.0M | 15,882,829 | 1.2706 | 909 | B200 |
 
-- Float mode, one seed per size.
+- Float mode, seed 1111. A second seed of 4×384 gives 16,394,003 bytes, 0.20% more.
 - 4×384 is 0.4% behind 6×512 after 1.1M tokens and 3.1% behind after 31.3M tokens.
 - The learning rates came from the short-block 10 MB sweep. The long-block 10 MB sweep prefers a quarter of that rate for 4×384 and 6×512.
 
@@ -116,4 +118,3 @@ Float mode, 64 streams, best of three to five learning rates, mean of two seeds.
 ## Still running
 
 - The 100 MB decode on a B200.
-- A second float seed on 100 MB.

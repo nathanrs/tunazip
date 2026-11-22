@@ -171,6 +171,7 @@ Float mode, 64 streams, the 100 MB recipe on the 10 MB slice. Each size ran thre
 | 12×768 | 93.0M | 8e-4 | 15,882,829 | 1.2706 | +0.1% | 909 | B200 |
 
 - 6×512 saves 494,716 bytes over 4×384 for 214 more minutes.
+- A second seed of 4×384 gives 16,394,003 bytes in 372 minutes, 0.20% more than the first.
 - 12×768 has four times the parameters of 6×512 and ends 0.1% behind it.
 - The 12×768 learning rate was tuned on 10 MB. A rate tuned on 100 MB may change its rank.
 

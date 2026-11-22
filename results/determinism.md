@@ -47,14 +47,14 @@ Two cheaper checks run on every device before a round trip:
 - Two seeds of one mode differ by 0.04% to 0.25%, so the two modes are within seed noise of each other.
 - On the 1 MB slice the deterministic mean is 275,240 bytes against 275,180 for float, a difference of 0.02%.
 
-## Deterministic mode takes 3.0 to 3.4 times as long as float with full contexts
+## Deterministic mode takes 2.9 to 3.4 times as long as float with full contexts
 
 | Slice | Recipe | Float minutes | Deterministic minutes | Ratio |
 |---|---|---|---|---|
 | 1 MB | Short blocks | 3.3 to 3.7 | 6.5 | 1.8 to 2.0 |
 | 10 MB | Short blocks | 35.7 and 52.9 | 76.7 and 77.1 | 1.5 to 2.2 |
 | 10 MB | Long blocks | 20.7 and 23.3 | 70.6 and 70.3 | 3.0 to 3.4 |
-| 100 MB | Long blocks | 329 | 1,076 | 3.3 |
+| 100 MB | Long blocks | 329 and 372 | 1,076 | 2.9 to 3.3 |
 
 - With long blocks most online steps see 192 tokens of context, and that step is where deterministic mode is slowest.
 - With short blocks the online steps see 41 tokens on average, so the ratio is lower.
@@ -65,21 +65,23 @@ Two cheaper checks run on every device before a round trip:
 
 The deterministic step replays as a CUDA graph of fused kernels. Run eagerly it took 140 ms per step at 4×384.
 
-## On the full 100 MB, deterministic mode costs 0.20% more bytes and 3.3 times the time
+## On the full 100 MB, deterministic mode is inside float seed noise and takes 2.9 to 3.3 times as long
 
-4×384, seed 1111, learning rate 1e-3, one H100 each.
+4×384, learning rate 1e-3, one H100 each.
 
-| Mode | Modeled bytes | Bits per byte | Minutes | Tokens per second |
-|---|---|---|---|---|
-| Float bf16 | 16,362,011 | 1.3090 | 329 | 1,589 |
-| Deterministic, 16 bits | 16,394,464 | 1.3116 | 1,076 | 485 |
+| Mode | Seed | Modeled bytes | Bits per byte | Minutes | Tokens per second |
+|---|---|---|---|---|---|
+| Float bf16 | 1111 | 16,362,011 | 1.3090 | 329 | 1,589 |
+| Float bf16 | 2222 | 16,394,003 | 1.3115 | 372 | 1,403 |
+| Deterministic, 16 bits | 1111 | 16,394,464 | 1.3116 | 1,076 | 485 |
 
-- The deterministic run is 32,453 bytes larger, which is 0.20%.
-- The deterministic run takes 3.27 times as long.
+- The two float seeds differ by 31,992 bytes, which is 0.20%.
+- The deterministic run is 0.20% above float seed 1111, 461 bytes above float seed 2222, and 0.10% above the float mean of 16,378,007.
+- The deterministic run takes 3.27 times as long as float seed 1111 and 2.89 times as long as float seed 2222.
 - The deterministic payload is 16,395,046 bytes. With the 29,081-byte dictionary the file is 16,424,127 bytes, which is 1.3139 bits per byte.
-- One seed per mode. A second float seed is 0.15% above the first at 17.8M tokens, so 0.20% is the size of seed noise.
+- The deterministic run has one seed.
 
-The table shows the bytes written so far at matching points of the runs. The 22-bit-gradient run was stopped at 21.09M tokens.
+The table shows the bytes written so far at matching points of the seed 1111 runs. The 22-bit-gradient run was stopped at 21.09M tokens.
 
 | Tokens coded | Float | 16-bit gradients | Against float | 22-bit gradients | Against float |
 |---|---|---|---|---|---|
@@ -91,7 +93,7 @@ The table shows the bytes written so far at matching points of the runs. The 22-
 | 31.33M | 16,362,011 | 16,394,464 | +0.20% | | |
 
 - The 16-bit gap is steady at 0.20% to 0.21% from 10M tokens to the end.
-- The 22-bit run is 0.41% ahead of the 16-bit run at 21.09M tokens, with one seed each.
+- The 22-bit run is 0.41% ahead of the 16-bit run at 21.09M tokens, with one seed each. Two float seeds end 0.20% apart.
 
 ## Gradients need 16 bits at 10 MB
 
