@@ -10,6 +10,24 @@
 - Two recipes appear. The short-block recipe has 5,375-token blocks on 10 MB, which caps the online context at 82 tokens. The long-block recipe has 54,926-token blocks, which gives the full 192-token context. `scaling.md` measures the difference.
 - The round trips and the first bit-width tables use the short-block recipe.
 
+## A float-mode file decodes only on the GPU type that encoded it
+
+The first 1 MB of enwik8, encoded in float mode on an H100. The payload is 276,113 bytes for 268,011 tokens.
+
+| Decoder | GPU generation | Decodes the file | First wrong token | Wrong tokens |
+|---|---|---|---|---|
+| H100, a second machine | Hopper | yes | | 0 |
+| B200 | Blackwell | no | 2 | 267,844 |
+| A100 | Ampere | no | 1 | 267,988 |
+| L40S | Ada | no | 1 | 267,966 |
+| A10 | Ampere | no | 1 | 267,975 |
+
+- On the four other GPU types the decoder goes wrong within the first three tokens and gets over 99.9% of the file wrong.
+- On the A100 the logits of the first forward pass already differ from the encoder's.
+- On the B200 the first step matches the encoder, and the first wrong token is two steps later.
+- The second H100 reproduces the encoder's parameter hash at every checkpoint. Float mode repeats on the same GPU model with the same software, and nothing guarantees that.
+- The model, recipe and seed are the ones of the deterministic 1 MB round trip below.
+
 ## A file encoded on an H100 decodes byte-exactly on five other GPU types
 
 Each decode reproduced the token stream and restored the original file bytes through the word preprocessor.

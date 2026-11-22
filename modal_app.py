@@ -97,10 +97,14 @@ def run_fork(spec):
         result["payload_bytes"] = payload.stat().st_size
     else:
         decoded, result, run = codec.decode(str(payload), device, **options)
-        result["decoded_matches"] = bool((decoded == tokens).all())
+        wrong = (decoded != tokens).nonzero()[0]
+        result["decoded_matches"] = len(wrong) == 0
+        result["wrong_tokens"] = len(wrong)
+        result["first_wrong_token"] = int(wrong[0]) if len(wrong) else None
         result["decoded_sha"] = hashlib.sha256(decoded.tobytes()).hexdigest()[:16]
         if not spec.get("max_tokens"):
-            result["restores_original_bytes"] = restores_original(spec["data"], decoded)
+            result["restores_original_bytes"] = (
+                result["decoded_matches"] and restores_original(spec["data"], decoded))
     if tracer is not None:
         tracer.write(run_dir / "trace.jsonl")
     with open(run_dir / "digests.jsonl", "w") as file:
