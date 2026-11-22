@@ -42,8 +42,10 @@ Each decode reproduced the token stream and restored the original file bytes thr
 | 1 MB | 275,620 | T4 | Turing | 253.1 | yes |
 | 10 MB | 2,101,694 | B200 | Blackwell | 71.7 | yes |
 | 10 MB | 2,101,694 | A100 | Ampere | 135.9 | yes |
+| 100 MB | 16,395,046 | B200 | Blackwell | 986.4 | yes |
 
-- The H100 encodes took 6.6 minutes for 1 MB and 76.7 minutes for 10 MB.
+- The H100 encodes took 6.6 minutes for 1 MB, 76.7 minutes for 10 MB and 1,076 minutes for 100 MB.
+- The 100 MB decode ends with the encoder's parameter hash after 489,533 online steps and 1,005,662 replay steps.
 - Decode time follows float64 throughput. The L40S, A10 and T4 are 7 to 39 times slower than the H100 on the 1 MB file.
 
 Two cheaper checks run on every device before a round trip:

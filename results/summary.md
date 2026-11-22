@@ -30,8 +30,9 @@ detzip is a fork of tufazip whose compressed files decode byte-exactly on a diff
 |---|---|
 | 1 MB, 275,620-byte payload | B200, A100, L40S, A10, T4 |
 | 10 MB, 2,101,694-byte payload | B200, A100 |
-| 100 MB, 16,395,046-byte payload | B200 decode is running |
+| 100 MB, 16,395,046-byte payload | B200 |
 
+- The 100 MB decode took 986 minutes on the B200, against 1,076 minutes for the H100 encode.
 - The six GPU types span five generations: Turing, Ampere, Ada, Hopper and Blackwell.
 - 31 operation hashes are identical on the six GPU types, a Linux CPU and a macOS CPU.
 - A 16,000-token training run ends with the same parameter hash on the six GPU types and the CPU.
@@ -119,7 +120,3 @@ Float mode, 64 streams, best of three to five learning rates, mean of two seeds.
 - More than 64 streams do not shorten a float run, because replay steps dominate and a float step costs the same at any batch size.
 - The 100 MB deterministic time was first estimated at 13 hours from the 10 MB token rate. It took 17.9 hours, because 100 MB online steps use the full 192-token window.
 - The 12×768 learning rate was not tuned on 100 MB.
-
-## Still running
-
-- The 100 MB decode on a B200.
