@@ -157,6 +157,39 @@ Float mode, 64 streams, the 100 MB recipe on the 10 MB slice. Each size ran thre
 - Four times the replay steps cost 1.87% more bytes and 34 more minutes.
 - The replay learning-rate schedule counts replay steps and was not rescaled, so a run with more replay steps also ends at a lower replay rate. The table measures both changes together.
 
+## Replay is worth 6.5% of the bytes on 10 MB, and half of it is free
+
+4×384 on 10 MB, float mode, 64 streams, long blocks, seed 1111. The baseline is the 1e-3 run with the full replay window.
+
+| Replay | Online learning rate | Replay steps | Bytes | Against full replay | Minutes |
+|---|---|---|---|---|---|
+| Full window, 3,844,818 tokens | 1e-3 | 41,317 | 2,038,742 | | 20.7 |
+| Window of 961,204 tokens | 1e-3 | 21,970 | 2,040,265 | +0.07% | 25.8 |
+| Window of 439,408 tokens | 1e-3 | 11,074 | 2,063,492 | +1.21% | 17.1 |
+| Off | 6e-5 | 0 | 2,270,110 | +11.35% | 12.0 |
+| Off | 1.25e-4 | 0 | 2,198,531 | +7.84% | 13.0 |
+| Off | 2.5e-4 | 0 | 2,170,190 | +6.45% | 12.6 |
+| Off | 1e-3 | 0 | 2,187,089 | +7.28% | 12.6 |
+| Off | 4e-3 | 0 | 2,252,773 | +10.50% | 17.0 |
+
+- Without replay the best online rate is 2.5e-4, and it is bracketed on both sides.
+- The best run without replay is 6.45% larger than the baseline and 7.21% larger than the best full-replay run (2,024,199 bytes at 2.5e-4).
+- Keeping 53% of the replay steps changes the size by 0.07%. Two seeds of one setting differ by 0.12% to 0.32%.
+- Keeping 27% of the replay steps costs 1.21%.
+- The file has 3,065,672 tokens, so the full window rereads the whole file after every block. A token is replayed 28 times on average.
+- The two shorter windows use the same replay schedule with its step counts scaled by 0.532 and 0.268.
+- Float wall time varies with the host. The 961,204-token run took longer than the baseline with fewer steps.
+
+An online step runs 64 × 192 token positions through the model to train on 64 tokens. A replay step runs 32 × 192 positions to train on 2,048 tokens.
+
+| Slice | Online steps | Replay steps | Online positions | Replay positions | Replay passes per token |
+|---|---|---|---|---|---|
+| 10 MB | 47,902 | 41,317 | 589M | 254M | 28 |
+| 100 MB | 489,533 | 1,005,662 | 6.0B | 6.2B | 66 |
+
+- Dropping replay removes 39% of the float wall time on 10 MB: 12.6 minutes against 20.7.
+- On 100 MB the replay window covers the last 12% of the file. A shorter window was not tried there.
+
 ## On the full 100 MB, 6×512 is 3.0% ahead of 4×384
 
 - Data: all 100,000,000 bytes of enwik8, tokenized to 31,330,083 tokens. The dictionary adds 29,081 bytes.

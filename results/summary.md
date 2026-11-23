@@ -111,6 +111,7 @@ Float mode, 64 streams, best of three to five learning rates, mean of two seeds.
 - With short blocks 256 streams cost 11% to 13%. With long blocks and a tuned online rate they cost 1.0%.
 - 16 streams save 1.6% over 64 and take 2.6 times as long.
 - 54,926-token blocks are the best of five block lengths from 13,731 to 219,704.
+- Turning replay off costs 6.45% on 10 MB and saves 39% of the float time. Keeping 53% of the replay steps costs nothing measurable.
 
 ## What did not work
 
